@@ -1,0 +1,15 @@
+{
+    "$schema": "https://schemas.cute.engineering/stable/cutekit.manifest.component.v1",
+    "id": "vaerk-riscv",
+    "type": "lib",
+    "description": "Definitions for riscv architecture",
+    "enableIf": {
+        "arch": [
+            "riscv32",
+            "riscv64"
+        ]
+    },
+    "requires": [
+        "karm-core"
+    ]
+}

@@ -1,0 +1,13 @@
+{
+    "$schema": "https://schemas.cute.engineering/stable/cutekit.manifest.project.v1",
+    "id": "skift-org/vaerk",
+    "type": "project",
+    "version": "v0.1.0",
+    "description": "A framework for building kernel, bootloader, and drivers.",
+    "extern": {
+        "skift-org/karm": {
+            "git": "https://github.com/skift-org/karm.git",
+            "tag": "main"
+        }
+    }
+}
