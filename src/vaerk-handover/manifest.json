@@ -1,0 +1,9 @@
+{
+    "$schema": "https://schemas.cute.engineering/stable/cutekit.manifest.component.v1",
+    "id": "vaerk-handover",
+    "type": "lib",
+    "description": "The handover boot protocol",
+    "requires": [
+        "karm-core"
+    ]
+}

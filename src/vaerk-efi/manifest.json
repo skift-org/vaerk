@@ -2,7 +2,10 @@
     "$schema": "https://schemas.cute.engineering/stable/cutekit.manifest.component.v1",
     "id": "vaerk-efi",
     "type": "lib",
-    "requires": [
-        "karm-core"
-    ]
+    "description": "EFI firmware",
+    "enableIf": {
+        "abi": [
+            "ms"
+        ]
+    }
 }
