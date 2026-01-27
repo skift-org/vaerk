@@ -1,6 +1,6 @@
 #pragma once
 
-#include <karm-core/macros.h>
+#include <karm/macros>
 
 #include "spec.h"
 
