@@ -39,4 +39,4 @@ export void consolePuts(Str str) {
     }
 }
 
-} // namespace Lilla::SBI
+} // namespace Vaerk::Sbi
