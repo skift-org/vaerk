@@ -244,4 +244,4 @@ export struct Image {
     }
 };
 
-} // namespace Elf
+} // namespace Vaerk::Elf
