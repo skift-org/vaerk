@@ -21,7 +21,7 @@ void init(Handle handle, SystemTable* st);
 template <typename P>
 inline Res<P*> openProtocol(Handle handle) {
     P* result = nullptr;
-    Guid guid = P::GUID;
+    Ref::Guid guid = P::GUID;
     try$(bs()->openProtocol(handle, &guid, (void**)&result, imageHandle(), nullptr, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL));
     return Ok(result);
 }
@@ -34,7 +34,7 @@ inline Res<P*> openProtocol() {
 template <typename P>
 inline Res<P*> locateProtocol() {
     P* result = nullptr;
-    Guid guid = P::GUID;
+    Ref::Guid guid = P::GUID;
     try$(bs()->locateProtocol(&guid, nullptr, (void**)&result));
     return Ok(result);
 }
