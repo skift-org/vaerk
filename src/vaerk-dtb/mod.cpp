@@ -1,3 +1,7 @@
+module;
+
+#include <karm/macros>
+
 export module Vaerk.Dtb;
 
 import Karm.Core;
@@ -48,13 +52,6 @@ export struct ReserveEntry {
 
 static constexpr auto RE_SEP = '\0'_re;
 
-enum struct Extra {
-    NIL,
-    STR,
-    REGS,
-    BYTES
-};
-
 static bool _sniffStr(Bytes extra) {
     if (not extra.len())
         return false;
@@ -73,6 +70,8 @@ static bool _sniffStr(Bytes extra) {
     }
     return hasPrint;
 }
+
+// MARK: Tokens ----------------------------------------------------------------
 
 struct Token {
     enum struct Type : u32 {
@@ -101,46 +100,16 @@ struct Token {
             e(" extra:{:#02x}", extra);
         e(")");
     }
-
-    Extra sniff() const {
-        if (extra.len() == 0 or (extra.len() == 1 and extra[0] == '\0'))
-            return Extra::NIL;
-        if (_sniffStr(extra))
-            return Extra::STR;
-        if (extra.len() % sizeof(u32))
-            return Extra::BYTES;
-        return Extra::REGS;
-    }
-
-    Slice<u32be> regs() const {
-        if (sniff() != Extra::REGS)
-            return {};
-        return extra.cast<u32be>();
-    }
-
-    auto iterStr() {
-        struct Iter {
-            Io::SScan scan;
-
-            Opt<Str> next() {
-                if (scan.ended())
-                    return NONE;
-                scan.skip(RE_SEP);
-                return scan.token(Re::until(RE_SEP));
-            }
-        };
-
-        Str str = sub(extra, 0, extra.len() - 1).cast<char>();
-        return Iter(str);
-    }
 };
+
+// MARK: Iterators -------------------------------------------------------------
 
 Tuple<Str, Opt<usize>> _parseName(Str str) {
     Io::SScan s{str};
     auto name = s.token(Re::until("@"_re));
     Opt<usize> addr = NONE;
     if (s.skip("@")) {
-        addr = Io::atou(s, {.base = 16});
+        addr = Io::atou(s.token(Re::xdigit()), {.base = 16});
     }
     return {name, addr};
 }
@@ -176,8 +145,107 @@ struct TokenIter {
     }
 };
 
-struct PropIter;
-struct ChildrenIter;
+// MARK: Node ------------------------------------------------------------------
+
+export struct Prop {
+    enum struct Type {
+        NIL,
+        STR,
+        U32,
+        U64,
+        BYTES
+    };
+
+    using enum Type;
+
+    Token _token;
+
+    Str name() const {
+        return _token.name;
+    }
+
+    Type sniff() const {
+        if (raw().len() == 0 or (raw().len() == 1 and raw()[0] == '\0'))
+            return NIL;
+        if (_sniffStr(raw()))
+            return STR;
+        if ((raw().len() % sizeof(u32)) == 0)
+            return U32;
+        if ((raw().len() % sizeof(u64)) == 0)
+            return U64;
+        return BYTES;
+    }
+
+    Bytes raw() const {
+        return _token.extra;
+    }
+
+    Slice<u32be> regs32() const {
+        if (sniff() == U32 or sniff() == U64)
+            return raw().cast<u32be>();
+        return {};
+    }
+
+    Slice<u64be> regs64() const {
+        if (sniff() == U64)
+            return raw().cast<u64be>();
+        return {};
+    }
+
+    template <typename T>
+    Opt<T> as() {
+        if (raw().len() != sizeof(T))
+            return NONE;
+        return raw().cast<T>()[0];
+    }
+
+    struct StrIter {
+        Io::SScan scan;
+
+        Opt<Str> next() {
+            if (scan.ended())
+                return NONE;
+            scan.skip(RE_SEP);
+            return scan.token(Re::until(RE_SEP));
+        }
+    };
+
+    [[nodiscard]] auto iterStr() const {
+        Str str = sub(raw(), 0, raw().len() - 1).cast<char>();
+        return StrIter(str);
+    }
+
+    void dump(Io::Emit& e) const {
+        auto type = sniff();
+        if (type == NIL) {
+            e("{}", name());
+        } else if (type == U32 or type == U64) {
+            e("{} = <", name());
+            bool first = true;
+            for (auto r : regs32()) {
+                if (not first)
+                    e(" ");
+                else
+                    first = false;
+                e("{:#08x}", r);
+            }
+            e(">");
+        } else if (type == BYTES) {
+            e("{} = {:#02x}", name(), raw());
+        } else if (type == STR) {
+            e("{} = ", name());
+            bool first = true;
+            for (auto s : iterStr()) {
+                if (not first)
+                    e(" ");
+                else
+                    first = false;
+                e("{:#}", s);
+            }
+            e("");
+        }
+    }
+};
 
 export struct Node {
     TokenIter tokens;
@@ -194,107 +262,96 @@ export struct Node {
         return name;
     }
 
-    PropIter iterProp() const;
+    struct PropIter {
+        TokenIter tokens;
 
-    ChildrenIter iterChildren() const;
-
-    void dump(Io::Emit& e);
-};
-
-struct PropIter {
-    TokenIter tokens;
-
-    Opt<Token> next() {
-        auto token = tokens.next();
-        if (not token)
-            return NONE;
-        if (token->type != Token::PROP)
-            return NONE;
-        return token;
-    }
-};
-
-PropIter Node::iterProp() const {
-    auto copy = tokens;
-    (void)copy.next(); // skip begin node
-    return PropIter{copy};
-}
-
-struct ChildrenIter {
-    TokenIter tokens;
-    usize depth = 0;
-
-    Opt<Node> next() {
-        while (true) {
-            auto before = tokens;
+        Opt<Prop> next() {
             auto token = tokens.next();
             if (not token)
                 return NONE;
-            if (token->type == Token::BEGIN_NODE) {
-                depth++;
-                if (depth == 1) {
-                    return Node{before};
-                }
-            } else if (token->type == Token::END_NODE) {
-                if (depth == 0)
+            if (token->type != Token::PROP)
+                return NONE;
+            return token;
+        }
+    };
+
+    PropIter iterProp() const {
+        auto copy = tokens;
+        (void)copy.next(); // skip begin node
+        return {copy};
+    }
+
+    struct ChildrenIter {
+        TokenIter tokens;
+        usize depth = 0;
+
+        Opt<Node> next() {
+            while (true) {
+                auto before = tokens;
+                auto token = tokens.next();
+                if (not token)
                     return NONE;
-                depth--;
+                if (token->type == Token::BEGIN_NODE) {
+                    depth++;
+                    if (depth == 1) {
+                        return before;
+                    }
+                } else if (token->type == Token::END_NODE) {
+                    if (depth == 0)
+                        return NONE;
+                    depth--;
+                }
             }
         }
+    };
+
+    ChildrenIter iterChildren() const {
+        auto copy = tokens;
+        (void)copy.next(); // skip begin node
+        return {copy};
+    }
+
+    Opt<Node> findChildren(Str name) {
+        for (auto node : iterChildren()) {
+            if (node.name() == name)
+                return node;
+        }
+        return NONE;
+    }
+
+    Opt<Prop> getProperty(Str name) {
+        for (auto prop : iterProp()) {
+            if (prop.name() == name)
+                return prop;
+        }
+        return NONE;
+    }
+
+    template <typename T>
+    Opt<T> getProperty(Str name) {
+        auto prop = try$(getProperty(name));
+        return try$(prop.as<T>());
+    }
+
+    void dump(Io::Emit& e) const {
+        e("{}", name());
+        if (token().address) {
+            e(" @ {:p}", token().address);
+        }
+        e(" {");
+        e.indentNewline();
+        for (auto prop : iterProp()) {
+            prop.dump(e);
+            e(";\n");
+        }
+        for (auto child : iterChildren()) {
+            child.dump(e);
+            e(";\n");
+        }
+        e.deindent();
+        e("}");
     }
 };
-
-ChildrenIter Node::iterChildren() const {
-    auto copy = tokens;
-    (void)copy.next(); // skip begin node
-    return ChildrenIter{copy};
-}
-
-void Node::dump(Io::Emit& e) {
-    e("{}", name());
-    if (token().address) {
-        e(" @ {:p}", token().address);
-    }
-    e(" {");
-
-    e.indentNewline();
-    for (auto prop : iterProp()) {
-        auto type = prop.sniff();
-        if (type == Extra::NIL) {
-            e("{}", prop.name);
-        } else if (type == Extra::REGS) {
-            e("{} = <", prop.name);
-            bool first = true;
-            for (auto r : prop.regs()) {
-                if (not first)
-                    e(" ");
-                else
-                    first = false;
-                e("{:#08x}", r);
-            }
-            e(">");
-        } else if (type == Extra::BYTES) {
-            e("{} = {:#02x}", prop.name, prop.extra);
-        } else if (type == Extra::STR) {
-            e("{} = ", prop.name);
-            bool first = true;
-            for (auto s : prop.iterStr()) {
-                if (not first)
-                    e(" ");
-                else
-                    first = false;
-                e("{:#}", s);
-            }
-            e("");
-        }
-        e(";\n");
-    }
-    for (auto child : iterChildren()) {
-        child.dump(e);
-    }
-    e.deindent();
-    e("};\n");
-}
 
 // MARK: Blob ------------------------------------------------------------------
 
@@ -356,12 +413,19 @@ export struct Blob : Io::BChunk {
         return sub(reservations, 0, len);
     }
 
-    TokenIter iterTokens() {
+    TokenIter iterTokens() const {
         return {stringsBlock(), structureBlock()};
     }
 
-    Node root() {
+    Node root() const {
         return Node{iterTokens()};
+    }
+
+    Opt<Range<u64>> initrd() const {
+        auto chosenNode = try$(root().findChildren("chosen"));
+        auto initrdStart = try$(chosenNode.getProperty<u64>("linux,initrd-start"));
+        auto initrdEnd = try$(chosenNode.getProperty<u64>("linux,initrd-end"));
+        return Range<u64>::fromStartEnd(initrdStart, initrdEnd);
     }
 
     void dump(Io::Emit& e) {
@@ -375,6 +439,7 @@ export struct Blob : Io::BChunk {
         }
         e("tree:\n");
         root().dump(e);
+        e(";\n");
     }
 };
 
