@@ -4,8 +4,8 @@
     "type": "lib",
     "description": "EFI firmware",
     "enableIf": {
-        "abi": [
-            "ms"
+        "sys": [
+            "efi"
         ]
     }
 }
