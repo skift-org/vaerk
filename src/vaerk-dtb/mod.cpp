@@ -138,7 +138,10 @@ export struct Node {
     }
 
     PropIter iterProp() const;
+
     ChildrenIter iterChildren() const;
+
+    void dump(Io::Emit& e);
 };
 
 struct PropIter {
@@ -188,6 +191,26 @@ ChildrenIter Node::iterChildren() const {
     auto copy = tokens;
     (void)copy.next(); // skip begin node
     return ChildrenIter{copy};
+}
+
+void Node::dump(Io::Emit& e) {
+    e("{#} {{", name());
+    e.indentNewline();
+    for (auto prop : iterProp()) {
+        auto str = prop.extraStr();
+        if (str) {
+            e("{#} = {#}\n", prop.name, str);
+        } else if (prop.extra.len()) {
+            e("{#} = {:#02x}\n", prop.name, prop.extra);
+        } else {
+            e("{#}\n", prop.name);
+        }
+    }
+    for (auto child : iterChildren()) {
+        child.dump(e);
+    }
+    e.deindent();
+    e("}\n");
 }
 
 // MARK: Blob ------------------------------------------------------------------
@@ -256,6 +279,19 @@ export struct Blob : Io::BChunk {
 
     Node root() {
         return Node{iterTokens()};
+    }
+
+    void dump(Io::Emit& e) {
+        e("magic: {:x}\n", header().magic);
+        e("total size: {}\n", DataSize{header().totalSize});
+        e("version: {}\n", header().version);
+        e("last compatible version: {}\n", header().lastCompatibleVersion);
+        e("memory reservation:\n");
+        for (auto& reserved : memoryReservations()) {
+            e("  - {:#08x}-{:#08x}\n", reserved.address, reserved.address + reserved.size);
+        }
+        e("tree:\n");
+        root().dump(e);
     }
 };
 

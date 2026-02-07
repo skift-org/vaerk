@@ -4,6 +4,7 @@
     "type": "exe",
     "requires": [
         "vaerk-dtb",
-        "karm-sys"
+        "karm-sys",
+        "karm-cli"
     ]
 }
