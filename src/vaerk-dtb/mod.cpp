@@ -4,6 +4,7 @@ import Karm.Core;
 
 using namespace Karm;
 
+// https://devicetree-specification.readthedocs.io/en/v0.1/flattened-format.html
 namespace Vaerk::Dtb {
 
 export using Karm::begin;
@@ -45,6 +46,34 @@ export struct ReserveEntry {
 
 // MARK: Token -----------------------------------------------------------------
 
+static constexpr auto RE_SEP = '\0'_re;
+
+enum struct Extra {
+    NIL,
+    STR,
+    REGS,
+    BYTES
+};
+
+static bool _sniffStr(Bytes extra) {
+    if (not extra.len())
+        return false;
+
+    if (last(extra) != 0)
+        return false;
+
+    bool hasPrint = false;
+    for (auto b : sub(extra, 0, extra.len() - 1)) {
+        if (isAsciiPrint(b)) {
+            hasPrint = true;
+            continue;
+        }
+        if (b != '\0')
+            return false;
+    }
+    return hasPrint;
+}
+
 struct Token {
     enum struct Type : u32 {
         BEGIN_NODE = 0x00000001,
@@ -73,20 +102,48 @@ struct Token {
         e(")");
     }
 
-    Opt<Str> extraStr() {
-        if (not extra.len())
-            return NONE;
+    Extra sniff() const {
+        if (extra.len() == 0 or (extra.len() == 1 and extra[0] == '\0'))
+            return Extra::NIL;
+        if (_sniffStr(extra))
+            return Extra::STR;
+        if (extra.len() % sizeof(u32))
+            return Extra::BYTES;
+        return Extra::REGS;
+    }
 
-        if (last(extra) != 0)
-            return NONE;
+    Slice<u32be> regs() const {
+        if (sniff() != Extra::REGS)
+            return {};
+        return extra.cast<u32be>();
+    }
 
-        for (auto b : sub(extra, 0, extra.len() - 1)) {
-            if (not isAsciiPrint(b))
-                return NONE;
-        }
-        return Str::fromNullterminated((char const*)extra.buf());
+    auto iterStr() {
+        struct Iter {
+            Io::SScan scan;
+
+            Opt<Str> next() {
+                if (scan.ended())
+                    return NONE;
+                scan.skip(RE_SEP);
+                return scan.token(Re::until(RE_SEP));
+            }
+        };
+
+        Str str = sub(extra, 0, extra.len() - 1).cast<char>();
+        return Iter(str);
     }
 };
+
+Tuple<Str, Opt<usize>> _parseName(Str str) {
+    Io::SScan s{str};
+    auto name = s.token(Re::until("@"_re));
+    Opt<usize> addr = NONE;
+    if (s.skip("@")) {
+        addr = Io::atou(s, {.base = 16});
+    }
+    return {name, addr};
+}
 
 struct TokenIter {
     Bytes strings;
@@ -97,9 +154,9 @@ struct TokenIter {
             return NONE;
         auto type = static_cast<Token::Type>(tokens.nextU32be());
         if (type == Token::BEGIN_NODE) {
-            auto name = tokens.nextCStr();
+            auto [name, addr] = _parseName(tokens.nextCStr());
             tokens.align(sizeof(u32));
-            return Token{.type = type, .name = name};
+            return Token{.type = type, .name = name, .address = addr};
         } else if (type == Token::END_NODE) {
             return Token{.type = type};
         } else if (type == Token::PROP) {
@@ -194,23 +251,49 @@ ChildrenIter Node::iterChildren() const {
 }
 
 void Node::dump(Io::Emit& e) {
-    e("{#} {{", name());
+    e("{}", name());
+    if (token().address) {
+        e(" @ {:p}", token().address);
+    }
+    e(" {");
+
     e.indentNewline();
     for (auto prop : iterProp()) {
-        auto str = prop.extraStr();
-        if (str) {
-            e("{#} = {#}\n", prop.name, str);
-        } else if (prop.extra.len()) {
-            e("{#} = {:#02x}\n", prop.name, prop.extra);
-        } else {
-            e("{#}\n", prop.name);
+        auto type = prop.sniff();
+        if (type == Extra::NIL) {
+            e("{}", prop.name);
+        } else if (type == Extra::REGS) {
+            e("{} = <", prop.name);
+            bool first = true;
+            for (auto r : prop.regs()) {
+                if (not first)
+                    e(" ");
+                else
+                    first = false;
+                e("{:#08x}", r);
+            }
+            e(">");
+        } else if (type == Extra::BYTES) {
+            e("{} = {:#02x}", prop.name, prop.extra);
+        } else if (type == Extra::STR) {
+            e("{} = ", prop.name);
+            bool first = true;
+            for (auto s : prop.iterStr()) {
+                if (not first)
+                    e(" ");
+                else
+                    first = false;
+                e("{:#}", s);
+            }
+            e("");
         }
+        e(";\n");
     }
     for (auto child : iterChildren()) {
         child.dump(e);
     }
     e.deindent();
-    e("}\n");
+    e("};\n");
 }
 
 // MARK: Blob ------------------------------------------------------------------
