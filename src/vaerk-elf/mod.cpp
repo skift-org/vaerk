@@ -6,6 +6,8 @@ using namespace Karm;
 
 namespace Vaerk::Elf {
 
+export using Karm::begin, Karm::end;
+
 export struct [[gnu::packed]] SectionHeader {
     u32 name;
     u32 type;
@@ -209,13 +211,20 @@ export struct Image {
     }
 
     auto sections() {
-        return Iter([header = &header(), index = 0] mutable -> Opt<Section> {
-            if (index >= header->shnum)
-                return NONE;
-            auto section = Section{header, header->sectionAt(index)};
-            index++;
-            return section;
-        });
+        struct Iter {
+            ImageHeader* header;
+            usize index;
+
+            Opt<Section> next() {
+                if (index >= header->shnum)
+                    return NONE;
+                auto section = Section{header, header->sectionAt(index)};
+                index++;
+                return section;
+            }
+        };
+
+        return Iter{&header(), 0};
     }
 
     Opt<Section> sectionByName(Str name) {
@@ -228,15 +237,20 @@ export struct Image {
     }
 
     auto programs() {
-        return Iter([&header = header(), index = 0] mutable -> Opt<Program> {
-            if (index >= header.phnum) {
-                return NONE;
-            }
+        struct Iter {
+            ImageHeader* header;
+            usize index;
 
-            auto program = Program{&header, header.programAt(index)};
-            index++;
-            return program;
-        });
+            Opt<Program> next() {
+                if (index >= header->phnum)
+                    return NONE;
+                auto program = Program{header, header->programAt(index)};
+                index++;
+                return program;
+            }
+        };
+
+        return Iter{&header(), 0};
     }
 
     ProgramHeader* programAt(usize index) {
