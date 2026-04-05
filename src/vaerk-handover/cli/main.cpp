@@ -3,14 +3,14 @@ import Vaerk.Elf;
 #include <karm/entry>
 #include <vaerk-handover/spec.h>
 
-Async::Task<> entryPointAsync(Sys::Context& ctx, Async::CancellationToken) {
-    auto& args = useArgs(ctx);
+Async::Task<> entryPointAsync(Sys::Env& env, Async::CancellationToken) {
+    auto& args = env.args();
 
     if (args.len() == 0) {
         co_return Error::invalidInput("Usage: handover-dump <elf-file>");
     }
 
-    auto url = Ref::parseUrlOrPath(args[0], co_try$(Sys::pwd()));
+    auto url = Ref::parseUrlOrPath(args[0], env.cwd());
     auto kernelFile = co_try$(Sys::File::open(url));
     auto kernelMem = co_try$(Sys::mmap(kernelFile, {.options = Sys::MmapOption::READ}));
     Vaerk::Elf::Image kernelElf{kernelMem.bytes()};
