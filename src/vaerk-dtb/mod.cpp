@@ -7,6 +7,7 @@ export module Vaerk.Dtb;
 import Karm.Core;
 
 using namespace Karm;
+using namespace Karm::Re::Literals;
 
 // https://devicetree-specification.readthedocs.io/en/v0.1/flattened-format.html
 namespace Vaerk::Dtb {

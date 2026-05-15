@@ -4,6 +4,8 @@ import Vaerk.Dtb;
 import Karm.Cli;
 
 using namespace Karm;
+using namespace Karm::Literals;
+
 using namespace Vaerk;
 
 Async::Task<> entryPointAsync(Sys::Env& env, Async::CancellationToken) {
