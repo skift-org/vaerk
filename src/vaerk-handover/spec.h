@@ -9,14 +9,11 @@ using namespace Karm;
 namespace Handover {
 
 #ifdef __ck_bits_64__
-
 inline usize KERNEL_BASE = 0xffffffff80000000;
 inline usize UPPER_HALF = 0xffff800000000000;
 #else
-
 inline usize KERNEL_BASE = 0xc0000000;
 inline usize UPPER_HALF = 0xc0000000;
-
 #endif
 
 static constexpr u32 COOLBOOT = 0xc001b001;
@@ -28,7 +25,7 @@ static constexpr u32 COOLBOOT = 0xc001b001;
     TAG(STACK, 0xf65b391b)    \
     TAG(KERNEL, 0xbfc71b20)   \
     TAG(LOADER, 0xf1f80c26)   \
-    TAG(FILE, 0xcbc36d3b)     \
+    TAG(BLOB, 0xcbc36d3b)     \
     TAG(RSDP, 0x8d3bbb)       \
     TAG(FDT, 0xb628bbc1)      \
     TAG(FB, 0xe2d55685)       \
@@ -94,7 +91,7 @@ struct Record {
         {
             u32 name;
             u32 meta;
-        } file;
+        } blob;
 
         u64 more;
     };
@@ -142,9 +139,9 @@ struct Payload {
         return nullptr;
     }
 
-    Record const* fileByName(char const* name) const {
+    Record const* blobByName(char const* name) const {
         for (auto const& r : *this) {
-            if (r.tag == Tag::FILE and cstrEq(stringAt(r.file.name), name)) {
+            if (r.tag == Tag::BLOB and cstrEq(stringAt(r.blob.name), name)) {
                 return &r;
             }
         }
@@ -234,8 +231,8 @@ inline constexpr Request requestKernel() {
     return {Tag::KERNEL, 0, 0};
 }
 
-inline constexpr Request requestFiles() {
-    return {Tag::FILE, 0, 0};
+inline constexpr Request requestBlobs() {
+    return {Tag::BLOB, 0, 0};
 }
 
 inline constexpr Request requestRsdp() {
@@ -251,13 +248,11 @@ inline constexpr Request requestFb(PixelFormat preferedFormat = PixelFormat::BGR
 }
 
 inline bool valid(u32 magic, Payload const& payload) {
-    if (magic != COOLBOOT) {
+    if (magic != COOLBOOT)
         return false;
-    }
 
-    if (payload.magic != COOLBOOT) {
+    if (payload.magic != COOLBOOT)
         return false;
-    }
 
     return true;
 }
