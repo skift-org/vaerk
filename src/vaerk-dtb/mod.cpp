@@ -15,6 +15,8 @@ namespace Vaerk::Dtb {
 export using Karm::begin;
 export using Karm::end;
 
+// MARK: Header ----------------------------------------------------------------
+
 export struct Header {
     u32be magic;
     u32be totalSize;
@@ -49,6 +51,48 @@ export struct ReserveEntry {
     }
 };
 
+// MARK: Cells -----------------------------------------------------------------
+
+// https://devicetree-specification.readthedocs.io/en/stable/devicenodes.html#id2
+export struct InheritedProperties {
+    usize addressCells = 1;
+    usize sizeCells = 1;
+    usize interruptCells = 1;
+};
+
+export struct AddressSizeCell : Range<u64> {
+    using Range::Range;
+
+    static Res<AddressSizeCell> parse(Cursor<u32be>& c, InheritedProperties const& inherited) {
+        u64 address = 0;
+        for (auto _ : urange::zeroTo(inherited.addressCells)) {
+            if (c.ended())
+                return Error::invalidData();
+            address <<= 32;
+            address |= c.next();
+        }
+
+        u64 size = 0;
+        for (auto _ : urange::zeroTo(inherited.sizeCells)) {
+            if (c.ended())
+                return Error::invalidData();
+            size <<= 32;
+            size |= c.next();
+        }
+
+        return Ok(AddressSizeCell{address, size});
+    }
+
+    void repr(Io::Emit& e) const {
+        e("{:#x}-{:#x}", start, end());
+    }
+};
+
+export template <typename T>
+concept Cell = requires(Cursor<u32be>& c, InheritedProperties& inherited) {
+    { T::parse(c, inherited) } -> Meta::Same<Res<T>>;
+};
+
 // MARK: Token -----------------------------------------------------------------
 
 static constexpr auto RE_SEP = '\0'_re;
@@ -74,6 +118,15 @@ static bool _sniffStr(Bytes extra) {
 
 // MARK: Tokens ----------------------------------------------------------------
 
+Tuple<Str, Opt<usize>> _parseName(Str str) {
+    Io::SScan s{str};
+    auto name = s.token(Re::until("@"_re));
+    Opt<usize> addr = NONE;
+    if (s.skip("@"))
+        addr = Io::atou(s.token(Re::zeroOrMore(Re::xdigit())), {.base = 16});
+    return {name, addr};
+}
+
 struct Token {
     enum struct Type : u32 {
         BEGIN_NODE = 0x00000001,
@@ -87,16 +140,25 @@ struct Token {
     using enum Type;
 
     Type type;
-    Str name = "";
-    Opt<usize> address = NONE;
+    Str fullname = "";
     Bytes extra = {};
+
+    Str name() const {
+        auto [name, _] = _parseName(fullname);
+        return name;
+    }
+
+    Opt<usize> address() const {
+        auto [_, address] = _parseName(fullname);
+        return address;
+    }
 
     void repr(Io::Emit& e) const {
         e("({}", type);
-        if (name)
-            e(" name:{#}", name);
-        if (address)
-            e(" address:{:#08x}", address);
+        if (auto n = name())
+            e(" name:{#}", n);
+        if (auto addr = address())
+            e(" address:{:#08x}", addr);
         if (extra)
             e(" extra:{:#02x}", extra);
         e(")");
@@ -104,16 +166,6 @@ struct Token {
 };
 
 // MARK: Iterators -------------------------------------------------------------
-
-Tuple<Str, Opt<usize>> _parseName(Str str) {
-    Io::SScan s{str};
-    auto name = s.token(Re::until("@"_re));
-    Opt<usize> addr = NONE;
-    if (s.skip("@")) {
-        addr = Io::atou(s.token(Re::xdigit()), {.base = 16});
-    }
-    return {name, addr};
-}
 
 struct TokenIter {
     Bytes strings;
@@ -124,9 +176,9 @@ struct TokenIter {
             return NONE;
         auto type = static_cast<Token::Type>(tokens.nextU32be());
         if (type == Token::BEGIN_NODE) {
-            auto [name, addr] = _parseName(tokens.nextCStr());
+            auto fullname = tokens.nextCStr();
             tokens.align(sizeof(u32));
-            return Token{.type = type, .name = name, .address = addr};
+            return Token{.type = type, .fullname = fullname};
         } else if (type == Token::END_NODE) {
             return Token{.type = type};
         } else if (type == Token::PROP) {
@@ -135,7 +187,7 @@ struct TokenIter {
             auto name = Io::BScan{strings}.skip(nameoff).nextCStr();
             auto extra = tokens.nextBytes(len);
             tokens.align(sizeof(u32));
-            return Token{.type = type, .name = name, .extra = extra};
+            return Token{.type = type, .fullname = name, .extra = extra};
         } else if (type == Token::NOP) {
             return Token{.type = type};
         } else if (type == Token::END) {
@@ -160,9 +212,13 @@ export struct Prop {
     using enum Type;
 
     Token _token;
+    InheritedProperties _inherited;
+
+    Prop(Token token, InheritedProperties inherited)
+        : _token(token), _inherited(inherited) {}
 
     Str name() const {
-        return _token.name;
+        return _token.name();
     }
 
     Type sniff() const {
@@ -185,6 +241,12 @@ export struct Prop {
         if (sniff() == U32 or sniff() == U64)
             return raw().cast<u32be>();
         return {};
+    }
+
+    template <Cell C>
+    Res<C> cell() const {
+        Cursor c = regs32();
+        return C::parse(c, _inherited);
     }
 
     Slice<u64be> regs64() const {
@@ -249,70 +311,115 @@ export struct Prop {
 };
 
 export struct Node {
-    TokenIter tokens;
+    TokenIter _tokens;
+    InheritedProperties _inherited;
+
+    Node(TokenIter tokens, InheritedProperties inherited)
+        : _tokens(tokens),
+          _inherited(inherited) {
+        if (auto [addressCells] = getProperty("#address-cells")) {
+            if (auto [cells] = addressCells.as<u32be>()) {
+                _inherited.addressCells = cells;
+            }
+        }
+
+        if (auto [sizeCells] = getProperty("#size-cells")) {
+            if (auto [cells] = sizeCells.as<u32be>()) {
+                _inherited.sizeCells = cells;
+            }
+        }
+
+        if (auto [interruptCells] = getProperty("#interrupt-cells")) {
+            if (auto [cells] = interruptCells
+                                   .as<u32be>()) {
+                _inherited.interruptCells = cells;
+            }
+        }
+    }
 
     Token token() const {
-        auto copy = tokens;
+        auto copy = _tokens;
         return copy.next().unwrap();
     }
 
+    Str fullname() const {
+        return token().fullname;
+    }
+
     Str name() const {
-        auto name = token().name;
+        auto name = token().name();
         if (not name)
             return "/";
         return name;
     }
 
+    Opt<usize> address() const {
+        return token().address();
+    }
+
     struct PropIter {
-        TokenIter tokens;
+        TokenIter _tokens;
+        InheritedProperties _inherited;
 
         Opt<Prop> next() {
-            auto token = tokens.next();
+            auto token = _tokens.next();
             if (not token)
                 return NONE;
             if (token->type != Token::PROP)
                 return NONE;
-            return token;
+            return Prop{token.unwrap(), _inherited};
         }
     };
 
     PropIter iterProp() const {
-        auto copy = tokens;
+        auto copy = _tokens;
         (void)copy.next(); // skip begin node
-        return {copy};
+        return {copy, _inherited};
     }
 
     struct ChildrenIter {
-        TokenIter tokens;
-        usize depth = 0;
+        TokenIter _tokens;
+        InheritedProperties _inherited;
+        usize _depth = 0;
+
+        ChildrenIter(TokenIter tokens, InheritedProperties inherited)
+            : _tokens(tokens),
+              _inherited(inherited) {}
 
         Opt<Node> next() {
             while (true) {
-                auto before = tokens;
-                auto token = tokens.next();
+                auto before = _tokens;
+                auto token = _tokens.next();
                 if (not token)
                     return NONE;
                 if (token->type == Token::BEGIN_NODE) {
-                    depth++;
-                    if (depth == 1) {
-                        return before;
+                    _depth++;
+                    if (_depth == 1) {
+                        return Node{before, _inherited};
                     }
                 } else if (token->type == Token::END_NODE) {
-                    if (depth == 0)
+                    if (_depth == 0)
                         return NONE;
-                    depth--;
+                    _depth--;
                 }
             }
         }
     };
 
     ChildrenIter iterChildren() const {
-        auto copy = tokens;
+        auto copy = _tokens;
         (void)copy.next(); // skip begin node
-        return {copy};
+        return {copy, _inherited};
     }
 
-    Opt<Node> findChildren(Str name) {
+    auto iterChildrenByType(Str type) const {
+        return iterChildren() |
+               Where([=](Dtb::Node& n) {
+                   return n.name() == type;
+               });
+    }
+
+    Opt<Node> findChildren(Str name) const {
         for (auto node : iterChildren()) {
             if (node.name() == name)
                 return node;
@@ -320,7 +427,7 @@ export struct Node {
         return NONE;
     }
 
-    Opt<Prop> getProperty(Str name) {
+    Opt<Prop> getProperty(Str name) const {
         for (auto prop : iterProp()) {
             if (prop.name() == name)
                 return prop;
@@ -328,17 +435,23 @@ export struct Node {
         return NONE;
     }
 
+    template <Cell C>
+    Opt<C> getProperty(Str name) const {
+        auto prop = try$(getProperty(name));
+        return prop.cell<C>().ok();
+    }
+
     template <typename T>
-    Opt<T> getProperty(Str name) {
+    Opt<T> getProperty(Str name) const {
         auto prop = try$(getProperty(name));
         return try$(prop.as<T>());
     }
 
     void dump(Io::Emit& e) const {
         e("{}", name());
-        if (token().address) {
-            e(" @ {:p}", token().address);
-        }
+        if (auto [addr] = address())
+            e(" @ {:p}", addr);
+        e(" {#} ", fullname());
         e(" {");
         e.indentNewline();
         for (auto prop : iterProp()) {
@@ -367,7 +480,6 @@ export struct Blob : Io::BChunk {
         auto const* hd = static_cast<u32be const*>(addr);
         if (hd[0] != MAGIC)
             return Error::invalidData("invalid magic number");
-
         return open(Bytes{static_cast<u8 const*>(addr), hd[1]});
     }
 
@@ -419,13 +531,13 @@ export struct Blob : Io::BChunk {
     }
 
     Node root() const {
-        return Node{iterTokens()};
+        return Node{iterTokens(), InheritedProperties{}};
     }
 
     Opt<Range<u64>> initrd() const {
         auto chosenNode = try$(root().findChildren("chosen"));
-        auto initrdStart = try$(chosenNode.getProperty<u64>("linux,initrd-start"));
-        auto initrdEnd = try$(chosenNode.getProperty<u64>("linux,initrd-end"));
+        auto initrdStart = try$(chosenNode.getProperty<u64be>("linux,initrd-start"));
+        auto initrdEnd = try$(chosenNode.getProperty<u64be>("linux,initrd-end"));
         return Range<u64>::fromStartEnd(initrdStart, initrdEnd);
     }
 

@@ -43,7 +43,10 @@ struct Builder {
         : _buf(slice.buf()),
           _size(slice.len()),
           _string((char*)end(slice)),
-          _records(ViewBuf<Record>{(Manual<Record>*)payload().records, _size / sizeof(Record)}) {
+          _records(ViewBuf{
+              reinterpret_cast<Manual<Record>*>(payload().records),
+              _size / sizeof(Record),
+          }) {
         payload() = {};
         payload().magic = COOLBOOT;
         payload().size = slice.len();
@@ -63,7 +66,7 @@ struct Builder {
             // Merge with previous
             if (other.tag == record.tag and
                 other.end() == record.start and
-                shouldMerge(record.tag)) {
+                isFree(record.tag)) {
                 // logDebug("handover: merge {} with {}", record, other);
                 _records.removeAt(i);
                 other.size += record.size;
@@ -74,7 +77,7 @@ struct Builder {
             // Merge with next
             if (other.tag == record.tag and
                 other.start == record.end() and
-                shouldMerge(record.tag)) {
+                isFree(record.tag)) {
                 // logDebug("handover: merge {} with {}", record, other);
 
                 _records.removeAt(i);
@@ -84,7 +87,7 @@ struct Builder {
             }
 
             if (colidesWith(record, other)) {
-                if (shouldMerge(record.tag) and not shouldMerge(other.tag)) {
+                if (isFree(record.tag) and not isFree(other.tag)) {
                     // logDebug("handover: splitting record {} with {}", record, other);
 
                     _records.removeAt(i);
@@ -94,7 +97,7 @@ struct Builder {
                     add(lower);
                     add(upper);
                     return;
-                } else if (not shouldMerge(record.tag) and shouldMerge(other.tag)) {
+                } else if (not isFree(record.tag) and isFree(other.tag)) {
                     // logDebug("handover: splitting record {} with {}", other, record);
 
                     _records.removeAt(i);

@@ -8,7 +8,9 @@ using namespace Karm;
 
 namespace Handover {
 
-#ifdef __ck_bits_64__
+#ifdef __ck_paging_sv39__
+inline usize UPPER_HALF = 0xffffffff00000000;
+#elifdef __ck_bits_64__
 inline usize KERNEL_BASE = 0xffffffff80000000;
 inline usize UPPER_HALF = 0xffff800000000000;
 #else
@@ -51,16 +53,8 @@ static char const* tagName(Tag tag) {
     return "UNKNOWN";
 }
 
-inline bool shouldMerge(Tag tag) {
-    switch (tag) {
-    case Tag::FREE:
-    case Tag::LOADER:
-    case Tag::RESERVED:
-        return true;
-
-    default:
-        return false;
-    }
+inline bool isFree(Tag tag) {
+    return tag == FREE;
 }
 
 enum struct PixelFormat : u16 {
