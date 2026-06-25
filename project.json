@@ -1,10 +1,10 @@
 {
-    "$schema": "https://schemas.cute.engineering/stable/cutekit.manifest.project.v1",
+    "$schema": "https://schemas.cute.engineering/stable/cutekit.manifest.project.v2",
     "id": "skift/vaerk",
     "type": "project",
     "version": "v0.1.0",
     "description": "A framework for building kernel, bootloader, and drivers.",
-    "extern": {
+    "externs": {
         "skift/karm": {
             "git": "https://codeberg.org/skift/karm.git",
             "tag": "main"
