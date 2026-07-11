@@ -2,9 +2,11 @@ export module Vaerk.Riscv;
 
 import Karm.Core;
 
+export import :sv39;
+
 using namespace Karm;
 
-namespace Vaerk::Riscv {
+namespace Riscv {
 
 // MARK: CSR -------------------------------------------------------------------
 
@@ -85,6 +87,14 @@ export void ei() { __asm__ __volatile__("csrsi mstatus, 8"); }
 
 export void sfenceVma() { __asm__ __volatile__("sfence.vma"); }
 
+export void sfenceVma(usize vaddr) {
+    __asm__ __volatile__("sfence.vma %0" ::"r"(vaddr));
+}
+
+export void sfenceVma(usize vaddr, usize asid) {
+    __asm__ __volatile__("sfence.vma %0, %1" ::"r"(vaddr), "r"(asid));
+}
+
 struct Ecall {
     long a0;
     long a1;
@@ -108,4 +118,4 @@ export Ecall ecall(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     return {a0, a1};
 }
 
-} // namespace Vaerk::Riscv
+} // namespace Riscv
