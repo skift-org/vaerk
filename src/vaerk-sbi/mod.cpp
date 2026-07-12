@@ -20,4 +20,11 @@ export void consolePuts(Str str) {
     }
 }
 
+// MARK: Chapter 6. Timer Extension (EID #0x54494D45 "TIME") ----------------------------------------------------------
+
+// 6.1. Function: Set Timer (FID #0)
+export void setTimer(u64 stimeValue) {
+    Riscv::ecall(stimeValue, 0, 0, 0, 0, 0, 0, 0x54494D45);
+}
+
 } // namespace Vaerk::Sbi
