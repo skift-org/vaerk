@@ -156,7 +156,7 @@ struct Token {
     void repr(Io::Emit& e) const {
         e("({}", type);
         if (auto n = name())
-            e(" name:{#}", n);
+            e(" name:{:#}", n);
         if (auto addr = address())
             e(" address:{:#08x}", addr);
         if (extra)
@@ -451,7 +451,7 @@ export struct Node {
         e("{}", name());
         if (auto [addr] = address())
             e(" @ {:p}", addr);
-        e(" {#} ", fullname());
+        e(" {:#} ", fullname());
         e(" {");
         e.indentNewline();
         for (auto prop : iterProp()) {

@@ -8,7 +8,7 @@ import Karm.Logger;
 template <>
 struct Karm::Io::Formatter<Handover::Record> {
     Res<> format(Io::TextWriter& writer, Handover::Record record) {
-        return Io::format(writer, "Record({}, {x}-{x})", record.name(), record.start, record.end());
+        return Io::format(writer, "Record({}, {:x}-{:x})", record.name(), record.start, record.end());
     }
 };
 
