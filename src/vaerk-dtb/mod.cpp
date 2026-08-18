@@ -178,18 +178,18 @@ struct TokenIter {
         if (type == Token::BEGIN_NODE) {
             auto fullname = tokens.nextCStr();
             tokens.align(sizeof(u32));
-            return Token{.type = type, .fullname = fullname};
+            return Some(Token{.type = type, .fullname = fullname});
         } else if (type == Token::END_NODE) {
-            return Token{.type = type};
+            return Some(Token{.type = type});
         } else if (type == Token::PROP) {
             auto len = tokens.nextU32be();
             auto nameoff = tokens.nextU32be();
             auto name = Io::BScan{strings}.skip(nameoff).nextCStr();
             auto extra = tokens.nextBytes(len);
             tokens.align(sizeof(u32));
-            return Token{.type = type, .fullname = name, .extra = extra};
+            return Some(Token{.type = type, .fullname = name, .extra = extra});
         } else if (type == Token::NOP) {
-            return Token{.type = type};
+            return Some(Token{.type = type});
         } else if (type == Token::END) {
             return NONE;
         } else {
@@ -259,7 +259,7 @@ export struct Prop {
     Opt<T> as() {
         if (raw().len() != sizeof(T))
             return NONE;
-        return raw().cast<T>()[0];
+        return Some(raw().cast<T>()[0]);
     }
 
     struct StrIter {
@@ -269,7 +269,7 @@ export struct Prop {
             if (scan.ended())
                 return NONE;
             scan.skip(RE_SEP);
-            return scan.token(Re::until(RE_SEP));
+            return Some(scan.token(Re::until(RE_SEP)));
         }
     };
 
@@ -367,7 +367,7 @@ export struct Node {
                 return NONE;
             if (token->type != Token::PROP)
                 return NONE;
-            return Prop{token.unwrap(), _inherited};
+            return Some(Prop{token.unwrap(), _inherited});
         }
     };
 
@@ -395,7 +395,7 @@ export struct Node {
                 if (token->type == Token::BEGIN_NODE) {
                     _depth++;
                     if (_depth == 1) {
-                        return Node{before, _inherited};
+                        return Some(Node{before, _inherited});
                     }
                 } else if (token->type == Token::END_NODE) {
                     if (_depth == 0)
@@ -422,7 +422,7 @@ export struct Node {
     Opt<Node> findChildren(Str name) const {
         for (auto node : iterChildren()) {
             if (node.name() == name)
-                return node;
+                return Some(node);
         }
         return NONE;
     }
@@ -430,7 +430,7 @@ export struct Node {
     Opt<Prop> getProperty(Str name) const {
         for (auto prop : iterProp()) {
             if (prop.name() == name)
-                return prop;
+                return Some(prop);
         }
         return NONE;
     }
@@ -444,7 +444,7 @@ export struct Node {
     template <typename T>
     Opt<T> getProperty(Str name) const {
         auto prop = try$(getProperty(name));
-        return try$(prop.as<T>());
+        return prop.as<T>();
     }
 
     void dump(Io::Emit& e) const {
@@ -538,7 +538,7 @@ export struct Blob : Io::BChunk {
         auto chosenNode = try$(root().findChildren("chosen"));
         auto initrdStart = try$(chosenNode.getProperty<u64be>("linux,initrd-start"));
         auto initrdEnd = try$(chosenNode.getProperty<u64be>("linux,initrd-end"));
-        return Range<u64>::fromStartEnd(initrdStart, initrdEnd);
+        return Some(Range<u64>::fromStartEnd(initrdStart, initrdEnd));
     }
 
     void dump(Io::Emit& e) {
