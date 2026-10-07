@@ -1,0 +1,27 @@
+#pragma once
+
+#ifdef __VAERK_HANDOVER_ENTRY_INCLUDED
+#    error "vaerk-handover/entry included twice"
+#endif
+
+#define __VAERK_HANDOVER_ENTRY_INCLUDED
+
+import Karm.Core;
+import Abi.SysV;
+import Vaerk.Handover;
+
+#include <vaerk-handover/macros>
+
+Karm::Res<> entryPoint(Karm::u64 magic, Handover::Payload& payload);
+
+extern "C" void _kstart(Karm::u64 magic, Handover::Payload* payload) {
+    Abi::SysV::init();
+    Karm::Res<> res = entryPoint(magic, *payload);
+
+    if (not res) {
+        Karm::panic(res.none().msg());
+    }
+
+    Abi::SysV::fini();
+    Karm::panic("handover: entryPoint returned ok");
+}

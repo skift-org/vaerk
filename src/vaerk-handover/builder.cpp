@@ -1,11 +1,12 @@
-#pragma once
+export module Vaerk.Handover:builder;
 
 import Karm.Core;
 import Karm.Logger;
+import :spec;
 
-#include "spec.h"
+using namespace Karm;
 
-template <>
+export template <>
 struct Karm::Io::Formatter<Handover::Record> {
     Res<> format(Io::TextWriter& writer, Handover::Record record) {
         return Io::format(writer, "Record({}, {:x}-{:x})", record.name(), record.start, record.end());
@@ -14,15 +15,15 @@ struct Karm::Io::Formatter<Handover::Record> {
 
 namespace Handover {
 
-inline urange rangeOf(Record record) {
+export inline urange rangeOf(Record record) {
     return {record.start, record.size};
 }
 
-inline bool colidesWith(Record record, Record other) {
+export inline bool colidesWith(Record record, Record other) {
     return rangeOf(record).overlaps(rangeOf(other));
 }
 
-inline Pair<Record, Record> split(Record record, Record other) {
+export inline Pair<Record, Record> split(Record record, Record other) {
     auto [lower, upper] = rangeOf(record).split(rangeOf(other));
     Record lowerRecord = record;
     Record upperRecord = record;
@@ -33,7 +34,7 @@ inline Pair<Record, Record> split(Record record, Record other) {
     return {lowerRecord, upperRecord};
 }
 
-struct Builder {
+export struct Builder {
     void* _buf{};
     usize _size{};
     char* _string{};

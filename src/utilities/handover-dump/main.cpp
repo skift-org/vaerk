@@ -1,7 +1,10 @@
+import Karm.Core;
 import Karm.Dl.Elf;
+import Vaerk.Handover;
+
+using namespace Karm;
 
 #include <karm/entry>
-#include <vaerk-handover/spec.h>
 
 Async::Task<> entryPointAsync(Sys::Env& env, Async::CancellationToken) {
     if (env.argsLen() == 0)

@@ -3,9 +3,6 @@
     "id": "vaerk-base",
     "type": "lib",
     "description": "Hardware abstraction primitives",
-    "props": {
-        "export-headers": ".."
-    },
     "requires": [
         "karm-core"
     ]

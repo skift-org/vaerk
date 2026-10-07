@@ -1,24 +1,22 @@
-#pragma once
+export module Vaerk.Handover:spec;
 
 import Karm.Core;
-
-#include "macros.h"
 
 using namespace Karm;
 
 namespace Handover {
 
 #ifdef __ck_paging_sv39__
-inline usize UPPER_HALF = 0xffffffff00000000;
+export inline usize UPPER_HALF = 0xffffffff00000000;
 #elifdef __ck_bits_64__
-inline usize KERNEL_BASE = 0xffffffff80000000;
-inline usize UPPER_HALF = 0xffff800000000000;
+export inline usize KERNEL_BASE = 0xffffffff80000000;
+export inline usize UPPER_HALF = 0xffff800000000000;
 #else
-inline usize KERNEL_BASE = 0xc0000000;
-inline usize UPPER_HALF = 0xc0000000;
+export inline usize KERNEL_BASE = 0xc0000000;
+export inline usize UPPER_HALF = 0xc0000000;
 #endif
 
-static constexpr u32 COOLBOOT = 0xc001b001;
+export inline constexpr u32 COOLBOOT = 0xc001b001;
 
 #define FOREACH_TAG(TAG)      \
     TAG(FREE, 0)              \
@@ -34,15 +32,15 @@ static constexpr u32 COOLBOOT = 0xc001b001;
     TAG(RESERVED, 0xb8841d2d) \
     TAG(END, 0xffffffff)
 
-enum struct Tag : u32 {
+export enum struct Tag : u32 {
 #define ITER(NAME, VALUE) NAME = VALUE,
     FOREACH_TAG(ITER)
 #undef ITER
 };
 
-using enum Tag;
+export using enum Tag;
 
-static char const* tagName(Tag tag) {
+export inline char const* tagName(Tag tag) {
     switch (tag) {
 #define ITER(NAME, VALUE) \
     case Tag::NAME:       \
@@ -53,16 +51,16 @@ static char const* tagName(Tag tag) {
     return "UNKNOWN";
 }
 
-inline bool isFree(Tag tag) {
+export inline bool isFree(Tag tag) {
     return tag == FREE;
 }
 
-enum struct PixelFormat : u16 {
+export enum struct PixelFormat : u16 {
     RGBX8888 = 0x7451,
     BGRX8888 = 0xd040,
 };
 
-struct Record {
+export struct Record {
     Tag tag;
     u32 flags = 0;
     u64 start = 0;
@@ -107,7 +105,7 @@ struct Record {
     }
 };
 
-struct Payload {
+export struct Payload {
     u32 magic, agent, size, len;
     Record records[];
 
@@ -203,7 +201,7 @@ struct Payload {
     }
 };
 
-struct Request {
+export struct Request {
     Tag tag;
     u32 flags;
     u64 more;
@@ -213,35 +211,35 @@ struct Request {
     }
 };
 
-inline constexpr Request requestSelf() {
+export inline constexpr Request requestSelf() {
     return {Tag::SELF, 0, 0};
 }
 
-inline constexpr Request requestStack(u64 preferedSize = 64 * 1024) {
+export inline constexpr Request requestStack(u64 preferedSize = 64 * 1024) {
     return {Tag::STACK, 0, preferedSize};
 }
 
-inline constexpr Request requestKernel() {
+export inline constexpr Request requestKernel() {
     return {Tag::KERNEL, 0, 0};
 }
 
-inline constexpr Request requestBlobs() {
+export inline constexpr Request requestBlobs() {
     return {Tag::BLOB, 0, 0};
 }
 
-inline constexpr Request requestRsdp() {
+export inline constexpr Request requestRsdp() {
     return {Tag::RSDP, 0, 0};
 }
 
-inline constexpr Request requestFdt() {
+export inline constexpr Request requestFdt() {
     return {Tag::FDT, 0, 0};
 }
 
-inline constexpr Request requestFb(PixelFormat preferedFormat = PixelFormat::BGRX8888) {
+export inline constexpr Request requestFb(PixelFormat preferedFormat = PixelFormat::BGRX8888) {
     return {Tag::FB, 0, (u64)preferedFormat};
 }
 
-inline bool valid(u32 magic, Payload const& payload) {
+export inline bool valid(u32 magic, Payload const& payload) {
     if (magic != COOLBOOT)
         return false;
 
@@ -251,8 +249,8 @@ inline bool valid(u32 magic, Payload const& payload) {
     return true;
 }
 
-static constexpr char const* REQUEST_SECTION = ".handover";
+export inline constexpr char const* REQUEST_SECTION = ".handover";
 
-using EntryPoint = void (*)(u64 magic, Payload const* handover);
+export using EntryPoint = void (*)(u64 magic, Payload const* handover);
 
 } // namespace Handover

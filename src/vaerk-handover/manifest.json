@@ -3,7 +3,11 @@
     "id": "vaerk-handover",
     "type": "lib",
     "description": "The handover boot protocol",
+    "props": {
+        "export-headers": "includes"
+    },
     "requires": [
-        "karm-core"
+        "karm-core",
+        "karm-logger"
     ]
 }

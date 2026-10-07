@@ -1,7 +1,5 @@
 #pragma once
 
-namespace Handover {
-
 // clang-format off
 
 #define HandoverSection$() \
@@ -16,5 +14,3 @@ namespace Handover {
     };
 
 // clang-format on
-
-} // namespace Handover

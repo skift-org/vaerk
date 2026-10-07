@@ -1,4 +1,8 @@
-#pragma once
+module;
+
+#include <karm/macros>
+
+export module Vaerk.Efi:spec;
 
 import Karm.Core;
 import Karm.App;
@@ -7,14 +11,13 @@ import Karm.Ref;
 using namespace Karm;
 
 namespace Efi {
+export using Handle = void*;
 
-using Handle = void*;
+export using Event = void*;
 
-using Event = void*;
+export using Status = usize;
 
-using Status = usize;
-
-struct Time {
+export struct Time {
     u16 year;
     u8 month;
     u8 day;
@@ -28,14 +31,14 @@ struct Time {
     u8 pad2;
 };
 
-struct TimeCapabilities {
+export struct TimeCapabilities {
     u32 resolution;
     u32 accuracy;
     bool setsToZero;
 };
 
-#define EFI_SUCCESS 0
-#define EFI_ERROR 1ull << 63
+export inline constexpr usize EFI_SUCCESS = 0;
+export inline constexpr usize EFI_ERROR = 1ull << 63;
 
 #define FOREACH_ERROR(ERR)                      \
     ERR(LOAD_ERROR, EFI_ERROR | 0x1)            \
@@ -72,14 +75,14 @@ struct TimeCapabilities {
     ERR(IP_ADDRESS_CONFLICT, EFI_ERROR | 0x22)  \
     ERR(HTTP_ERROR, EFI_ERROR | 0x23)
 
-enum : usize {
+export enum ErrorCode : usize {
 
 #define ERR(ERR, CODE) ERR_##ERR = CODE,
     FOREACH_ERROR(ERR)
 #undef ERR
 };
 
-[[gnu::used]] inline Res<> fromStatus(Status status) {
+export [[gnu::used]] inline Res<> fromStatus(Status status) {
     if ((status & EFI_ERROR) == 0) {
         return Ok();
     }
@@ -95,7 +98,7 @@ enum : usize {
 #undef ERR
 }
 
-template <typename... Args>
+export template <typename... Args>
 struct [[gnu::packed]] Method {
     Status (*func)(void* self, Args...);
 
@@ -104,9 +107,9 @@ struct [[gnu::packed]] Method {
     }
 };
 
-using DummyMethod = void*;
+export using DummyMethod = void*;
 
-template <typename... Args>
+export template <typename... Args>
 struct [[gnu::packed]] Function {
     Status (*func)(Args...);
 
@@ -115,13 +118,13 @@ struct [[gnu::packed]] Function {
     }
 };
 
-using DummyFunction = void*;
+export using DummyFunction = void*;
 
 static_assert(sizeof(Method<>) == sizeof(void*), "Method must be packed");
 
 // MARK: 4 System Table --------------------------------------------------------
 
-struct TableHeader {
+export struct TableHeader {
     u64 signature;
     u32 revision;
     u32 headerSize;
@@ -129,18 +132,18 @@ struct TableHeader {
     u32 reserved;
 };
 
-struct Table {
+export struct Table {
     TableHeader header;
 };
 
 // MARK: 4.3 System Table ------------------------------------------------------
 
-struct SimpleTextInputProtocol;
-struct SimpleTextOutputProtocol;
-struct RuntimeService;
-struct BootService;
+export struct SimpleTextInputProtocol;
+export struct SimpleTextOutputProtocol;
+export struct RuntimeService;
+export struct BootService;
 
-struct ConfigurationTable {
+export struct ConfigurationTable {
     static constexpr Ref::Guid ACPI_TABLE_GUID = {0xeb9d2d30, 0x2d88, 0x11d3, 0x9a16, {0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d}};
     static constexpr Ref::Guid ACPI2_TABLE_GUID = {0x8868e871, 0xe4f1, 0x11d3, 0xbc22, {0x00, 0x80, 0xc7, 0x3c, 0x88, 0x81}};
 
@@ -148,7 +151,7 @@ struct ConfigurationTable {
     void* table;
 };
 
-struct SystemTable : Table {
+export struct SystemTable : Table {
     u16* firmwareVendor;
     u32 firmwareRevision;
 
@@ -180,13 +183,13 @@ struct SystemTable : Table {
 
 // MARK: 7 Boot Services -------------------------------------------------------
 
-enum struct AllocateType : u32 {
+export enum struct AllocateType : u32 {
     ANY_PAGES,
     MAX_ADDRESS,
     ADDRESS,
 };
 
-enum struct MemoryType : u32 {
+export enum struct MemoryType : u32 {
     RESERVED_MEMORY_TYPE,
     LOADER_CODE,
     LOADER_DATA,
@@ -206,7 +209,7 @@ enum struct MemoryType : u32 {
     MAX_MEMORY_TYPE,
 };
 
-struct MemoryDescriptor {
+export struct MemoryDescriptor {
     MemoryType type;
     usize physicalStart;
     usize virtualStart;
@@ -214,14 +217,14 @@ struct MemoryDescriptor {
     u64 attribute;
 };
 
-#define EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL 0x00000001
-#define EFI_OPEN_PROTOCOL_GET_PROTOCOL 0x00000002
-#define EFI_OPEN_PROTOCOL_TEST_PROTOCOL 0x00000004
-#define EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER 0x00000008
-#define EFI_OPEN_PROTOCOL_BY_DRIVER 0x00000010
-#define EFI_OPEN_PROTOCOL_EXCLUSIVE 0x00000020
+export inline constexpr usize EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL = 0x00000001;
+export inline constexpr usize EFI_OPEN_PROTOCOL_GET_PROTOCOL = 0x00000002;
+export inline constexpr usize EFI_OPEN_PROTOCOL_TEST_PROTOCOL = 0x00000004;
+export inline constexpr usize EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER = 0x00000008;
+export inline constexpr usize EFI_OPEN_PROTOCOL_BY_DRIVER = 0x00000010;
+export inline constexpr usize EFI_OPEN_PROTOCOL_EXCLUSIVE = 0x00000020;
 
-struct BootService : Table {
+export struct BootService : Table {
     // Task Priority Services
     DummyFunction raiseTpl;
     DummyFunction lowerTpl;
@@ -291,14 +294,14 @@ struct BootService : Table {
 
 // MARK: 8 Runtime Services ----------------------------------------------------
 
-enum struct ResetType {
+export enum struct ResetType {
     RESET_COLD,
     RESET_WARM,
     RESET_SHUTDOWN,
     RESET_PLATFORM_SPECIFIC
 };
 
-struct RuntimeService : Table {
+export struct RuntimeService : Table {
     // Time Services
     Function<Time*, TimeCapabilities*> getTime;
     Function<Time*> setTime;
@@ -328,9 +331,9 @@ struct RuntimeService : Table {
 
 // MARK: 9.1 Load Image Protocol -----------------------------------------------
 
-struct DevicePathProtocol;
+export struct DevicePathProtocol;
 
-struct LoadedImageProtocol {
+export struct LoadedImageProtocol {
     static constexpr Ref::Guid GUID = {0x5B1B31A1, 0x9562, 0x11d2, 0x8E3F, {0x00, 0xA0, 0xC9, 0x69, 0x72, 0x3B}};
 
     u32 revision;
@@ -356,7 +359,7 @@ struct LoadedImageProtocol {
 
 // MARK: 10 Device Path Protocol -----------------------------------------------
 
-struct DevicePathProtocol {
+export struct DevicePathProtocol {
     static constexpr Ref::Guid GUID = {0x09576e91, 0x6d3f, 0x11d2, 0x8e39, {0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
 
     u8 type;
@@ -366,7 +369,7 @@ struct DevicePathProtocol {
 
 // MARK: 12.3 Simple Text Input Protocol ---------------------------------------
 
-enum ScanCode : u16 {
+export enum ScanCode : u16 {
     NONE = 0x00,
     UP = 0x01,
     DOWN = 0x02,
@@ -415,7 +418,7 @@ enum ScanCode : u16 {
     EJECT = 0x106,
 };
 
-struct Key {
+export struct Key {
     ScanCode scanCode;
     u16 unicodeChar;
 
@@ -503,7 +506,7 @@ struct Key {
     }
 };
 
-struct SimpleTextInputProtocol {
+export struct SimpleTextInputProtocol {
     static constexpr Ref::Guid GUID = {0x387477c1, 0x69c7, 0x11d2, 0x8e39, {0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
 
     Method<bool> reset;
@@ -513,29 +516,30 @@ struct SimpleTextInputProtocol {
 
 // MARK: 12.4 Simple Text Output Protocol --------------------------------------
 
-#define EFI_BLACK 0x00
-#define EFI_BLUE 0x01
-#define EFI_GREEN 0x02
-#define EFI_CYAN 0x03
-#define EFI_RED 0x04
-#define EFI_MAGENTA 0x05
-#define EFI_BROWN 0x06
-#define EFI_LIGHTGRAY 0x07
-#define EFI_BRIGHT 0x08
+export inline constexpr usize EFI_BLACK = 0x00;
+export inline constexpr usize EFI_BLUE = 0x01;
+export inline constexpr usize EFI_GREEN = 0x02;
+export inline constexpr usize EFI_CYAN = 0x03;
+export inline constexpr usize EFI_RED = 0x04;
+export inline constexpr usize EFI_MAGENTA = 0x05;
+export inline constexpr usize EFI_BROWN = 0x06;
+export inline constexpr usize EFI_LIGHTGRAY = 0x07;
+export inline constexpr usize EFI_BRIGHT = 0x08;
 
-#define EFI_DARKGRAY (EFI_BLACK | EFI_BRIGHT)
-#define EFI_LIGHTBLUE 0x09
-#define EFI_LIGHTGREEN 0x0A
-#define EFI_LIGHTCYAN 0x0B
-#define EFI_LIGHTRED 0x0C
-#define EFI_LIGHTMAGENTA 0x0D
-#define EFI_YELLOW 0x0E
-#define EFI_WHITE 0x0F
+export inline constexpr usize EFI_DARKGRAY = (EFI_BLACK | EFI_BRIGHT);
+export inline constexpr usize EFI_LIGHTBLUE = 0x09;
+export inline constexpr usize EFI_LIGHTGREEN = 0x0A;
+export inline constexpr usize EFI_LIGHTCYAN = 0x0B;
+export inline constexpr usize EFI_LIGHTRED = 0x0C;
+export inline constexpr usize EFI_LIGHTMAGENTA = 0x0D;
+export inline constexpr usize EFI_YELLOW = 0x0E;
+export inline constexpr usize EFI_WHITE = 0x0F;
 
-#define EFI_TEXT_ATTR(Foreground, Background) \
-    ((Foreground) | ((Background) << 4))
+export inline constexpr usize EFI_TEXT_ATTR(usize foreground, usize background) {
+    return foreground | (background << 4);
+}
 
-struct SimpleTextOutputMode {
+export struct SimpleTextOutputMode {
     u32 maxMode;
     u32 mode;
     u32 attribute;
@@ -544,7 +548,7 @@ struct SimpleTextOutputMode {
     bool cursorVisible;
 };
 
-struct SimpleTextOutputProtocol {
+export struct SimpleTextOutputProtocol {
     static constexpr Ref::Guid GUID = {0x387477c2, 0x69c7, 0x11d2, 0x8e39, {0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
 
     Method<bool> reset;
@@ -561,14 +565,14 @@ struct SimpleTextOutputProtocol {
 
 // MARK: 12.9 Graphics Output Protocol -----------------------------------------
 
-struct PixelBitmask {
+export struct PixelBitmask {
     u32 redMask;
     u32 greenMask;
     u32 blueMask;
     u32 reservedMask;
 };
 
-enum struct PixelFormat : u32 {
+export enum struct PixelFormat : u32 {
     RED_GREEN_BLUE_RESERVED8_BIT_PER_COLOR,
     BLUE_GREEN_RED_RESERVED8_BIT_PER_COLOR,
     BIT_MASK,
@@ -576,7 +580,7 @@ enum struct PixelFormat : u32 {
     FORMAT_MAX,
 };
 
-struct GraphicsOutputModeInformations {
+export struct GraphicsOutputModeInformations {
     u32 version;
     u32 horizontalResolution;
     u32 verticalResolution;
@@ -585,7 +589,7 @@ struct GraphicsOutputModeInformations {
     u32 pixelsPerScanLine;
 };
 
-struct GraphicsOutputProtocolMode {
+export struct GraphicsOutputProtocolMode {
     u32 maxMode;
     u32 mode;
     GraphicsOutputModeInformations* info;
@@ -594,7 +598,7 @@ struct GraphicsOutputProtocolMode {
     usize frameBufferSize;
 };
 
-struct GraphicsOutputProtocol {
+export struct GraphicsOutputProtocol {
     static constexpr Ref::Guid GUID = {0x9042a9de, 0x23dc, 0x4a38, 0x96fb, {0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a}};
 
     Method<u32, usize*, GraphicsOutputProtocolMode**> queryMode;
@@ -605,9 +609,9 @@ struct GraphicsOutputProtocol {
 
 // MARK: 13.4 Simple File System Protocol --------------------------------------
 
-struct FileProtocol;
+export struct FileProtocol;
 
-struct SimpleFileSystemProtocol {
+export struct SimpleFileSystemProtocol {
     static constexpr Ref::Guid GUID = {0x0964e5b22, 0x6459, 0x11d2, 0x8e39, {0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
 
     u64 revision;
@@ -616,7 +620,15 @@ struct SimpleFileSystemProtocol {
 
 // MARK: 13.5 File Protocol ----------------------------------------------------
 
-struct FileInfo {
+export inline constexpr usize EFI_FILE_READ_ONLY = 0x0000000000000001;
+export inline constexpr usize EFI_FILE_HIDDEN = 0x0000000000000002;
+export inline constexpr usize EFI_FILE_SYSTEM = 0x0000000000000004;
+export inline constexpr usize EFI_FILE_RESERVED = 0x0000000000000008;
+export inline constexpr usize EFI_FILE_DIRECTORY = 0x0000000000000010;
+export inline constexpr usize EFI_FILE_ARCHIVE = 0x0000000000000020;
+export inline constexpr usize EFI_FILE_VALID_ATTR = 0x0000000000000037;
+
+export struct FileInfo {
     static constexpr Ref::Guid GUID = {0x09576e92, 0x6d3f, 0x11d2, 0x8e39, {0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
 
     u64 size;
@@ -626,38 +638,24 @@ struct FileInfo {
     Time lastAccessTime;
     Time modificationTime;
 
-#define EFI_FILE_READ_ONLY 0x0000000000000001
-#define EFI_FILE_HIDDEN 0x0000000000000002
-#define EFI_FILE_SYSTEM 0x0000000000000004
-#define EFI_FILE_RESERVED 0x0000000000000008
-#define EFI_FILE_DIRECTORY 0x0000000000000010
-#define EFI_FILE_ARCHIVE 0x0000000000000020
-#define EFI_FILE_VALID_ATTR 0x0000000000000037
     u64 attribute;
     u16 fileName[];
 };
 
-struct FileIoToken {
+export struct FileIoToken {
     Event Event;
     Status Status;
     usize BufferSize;
     void* Buffer;
 };
 
-struct FileProtocol {
+export inline constexpr usize EFI_FILE_MODE_READ = 0x0000000000000001;
+export inline constexpr usize EFI_FILE_MODE_WRITE = 0x0000000000000002;
+export inline constexpr usize EFI_FILE_MODE_CREATE = 0x8000000000000000;
+
+export struct FileProtocol {
     u64 revision;
 
-#define EFI_FILE_MODE_READ 0x0000000000000001
-#define EFI_FILE_MODE_WRITE 0x0000000000000002
-#define EFI_FILE_MODE_CREATE 0x8000000000000000
-
-#define EFI_FILE_READ_ONLY 0x0000000000000001
-#define EFI_FILE_HIDDEN 0x0000000000000002
-#define EFI_FILE_SYSTEM 0x0000000000000004
-#define EFI_FILE_RESERVED 0x0000000000000008
-#define EFI_FILE_DIRECTORY 0x0000000000000010
-#define EFI_FILE_ARCHIVE 0x0000000000000020
-#define EFI_FILE_VALID_ATTR 0x0000000000000037
     Method<FileProtocol**, u16 const*, u64, u64> open;
     Method<> close;
     Method<> del;
