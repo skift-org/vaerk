@@ -10,6 +10,8 @@
         ]
     },
     "requires": [
-        "karm-core"
+        "karm-core",
+        "karm-logger",
+        "vaerk-base"
     ]
 }

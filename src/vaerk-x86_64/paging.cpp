@@ -1,41 +1,38 @@
-export module Vaerk.Riscv:sv39;
+export module Vaerk.x86_64:paging;
 
 import Karm.Core;
 import Vaerk.Base;
 
 using namespace Karm;
 
-namespace Riscv::Sv39 {
+namespace x86_64 {
 
 export struct [[gnu::packed]] Entry {
-    static constexpr u64 VALID = 1 << 0;
-    static constexpr u64 READ = 1 << 1;
-    static constexpr u64 WRITE = 1 << 2;
-    static constexpr u64 EXEC = 1 << 3;
-    static constexpr u64 USER = 1 << 4;
-    static constexpr u64 GLOBAL = 1 << 5;
-    static constexpr u64 ACCESSED = 1 << 6;
-    static constexpr u64 DIRTY = 1 << 7;
+    static constexpr u64 PRESENT = 1 << 0;
+    static constexpr u64 WRITE = 1 << 1;
+    static constexpr u64 USER = 1 << 2;
+    static constexpr u64 WRITE_THROUGH = 1 << 3;
+    static constexpr u64 NO_CACHE = 1 << 4;
+    static constexpr u64 ACCESSED = 1 << 5;
+    static constexpr u64 DIRTY = 1 << 6;
+    static constexpr u64 HUGE_PAGE = 1 << 7;
+    static constexpr u64 GLOBAL = 1 << 8;
 
-    // Sv39 supports up to a 56-bit physical address space
-    static constexpr u64 PADDR_MASK = 0x00fffffffffff000ULL;
-    // Lower 10 bits contain the flags and RSW field
-    static constexpr u64 FLAGS_MASK = 0x3ffULL;
-    // Mask for the PPN field within the raw 64-bit entry (bits 10-53)
-    static constexpr u64 PPN_MASK = 0x003ffffffffffc00ULL;
+    static constexpr u64 PADDR_MASK = 0x000ffffffffff000;
+    static constexpr u64 FLAGS_MASK = 0xfff;
 
     u64 _raw{};
 
     static u64 makeFlags(Flags<Vaerk::VmmFlags> flags) {
         u64 res = 0;
         if (flags.has(Vaerk::VmmFlags::READ)) {
-            res |= READ;
+            res |= WRITE;
         }
         if (flags.has(Vaerk::VmmFlags::WRITE)) {
             res |= WRITE;
         }
         if (flags.has(Vaerk::VmmFlags::EXEC)) {
-            res |= EXEC;
+            res |= 0;
         }
         if (flags.has(Vaerk::VmmFlags::USER)) {
             res |= USER;
@@ -43,14 +40,16 @@ export struct [[gnu::packed]] Entry {
         if (flags.has(Vaerk::VmmFlags::GLOBAL)) {
             res |= GLOBAL;
         }
-
+        if (flags.has(Vaerk::VmmFlags::UNCACHED)) {
+            res |= NO_CACHE;
+        }
         return res;
     }
 
     Entry() {}
 
     Entry(usize paddr, u64 flags) {
-        _raw = ((paddr & PADDR_MASK) >> 2) | (flags & FLAGS_MASK);
+        _raw = (paddr & PADDR_MASK) | (flags & FLAGS_MASK);
     }
 
     template <typename T>
@@ -58,24 +57,22 @@ export struct [[gnu::packed]] Entry {
         return (T*)paddr();
     }
 
-    usize paddr() const { return (_raw & PPN_MASK) << 2; }
+    usize paddr() const { return _raw & PADDR_MASK; }
 
     u64 flags() const { return _raw & FLAGS_MASK; }
 
-    void paddr(u64 paddr) { _raw = (((paddr & PADDR_MASK) >> 2)) | flags(); }
+    void paddr(u64 paddr) { _raw = (paddr & PADDR_MASK) | flags(); }
 
-    void flags(u64 flags) { _raw = (flags & FLAGS_MASK) | (_raw & PPN_MASK); }
+    void flags(u64 flags) { _raw = (flags & FLAGS_MASK) | paddr(); }
 
-    bool present() const { return _raw & VALID; }
-
-    bool isLeaf() const { return present() and (_raw & (READ | WRITE | EXEC)); }
+    bool present() const { return _raw & PRESENT; }
 };
 
 static_assert(sizeof(Entry) == 8);
 
 export template <usize L>
 struct [[gnu::packed]] Pml {
-    constexpr static usize LEVEL = L; // Level 3 = Root, Level 1 = Leaf
+    constexpr static usize LEVEL = L;
     constexpr static usize LEN = 512;
 
     using Lower = Pml<L - 1>;
@@ -101,9 +98,8 @@ struct [[gnu::packed]] Pml {
             return NONE;
         }
 
-        if (page.isLeaf() or LEVEL == 1) {
-            usize page_offset_mask = (1ULL << (12 + (LEVEL - 1) * 9)) - 1;
-            return Some(page.paddr() + (virt & page_offset_mask));
+        if (LEVEL == 1) {
+            return Some(page.paddr() + (virt & 0x1ff));
         }
 
         auto* pml = (Lower*)page.paddr();
@@ -131,4 +127,4 @@ struct [[gnu::packed]] Pml {
 
 static_assert(sizeof(Pml<1>) == 0x1000);
 
-} // namespace Riscv::Sv39
+} // namespace x86_64

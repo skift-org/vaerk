@@ -1,13 +1,16 @@
 {
     "$schema": "https://schemas.cute.engineering/stable/cutekit.manifest.component.v1",
-    "id": "vaerk-x86",
+    "id": "vaerk-x86_64",
     "type": "lib",
+    "description": "Definitions for x86_64 architecture",
     "enableIf": {
         "arch": [
             "x86_64"
         ]
     },
     "requires": [
-        "karm-core"
+        "karm-core",
+        "karm-logger",
+        "vaerk-base"
     ]
 }

@@ -256,7 +256,7 @@ export struct Prop {
     }
 
     template <typename T>
-    Opt<T> as() {
+    Opt<T> as() const {
         if (raw().len() != sizeof(T))
             return NONE;
         return Some(raw().cast<T>()[0]);
@@ -317,20 +317,20 @@ export struct Node {
     Node(TokenIter tokens, InheritedProperties inherited)
         : _tokens(tokens),
           _inherited(inherited) {
-        if (auto [addressCells] = getProperty("#address-cells")) {
-            if (auto [cells] = addressCells.as<u32be>()) {
+        if (auto const& [addressCells] = getProperty("#address-cells")) {
+            if (auto const& [cells] = addressCells.as<u32be>()) {
                 _inherited.addressCells = cells;
             }
         }
 
-        if (auto [sizeCells] = getProperty("#size-cells")) {
-            if (auto [cells] = sizeCells.as<u32be>()) {
+        if (auto const& [sizeCells] = getProperty("#size-cells")) {
+            if (auto const& [cells] = sizeCells.as<u32be>()) {
                 _inherited.sizeCells = cells;
             }
         }
 
-        if (auto [interruptCells] = getProperty("#interrupt-cells")) {
-            if (auto [cells] = interruptCells
+        if (auto const& [interruptCells] = getProperty("#interrupt-cells")) {
+            if (auto const& [cells] = interruptCells
                                    .as<u32be>()) {
                 _inherited.interruptCells = cells;
             }
@@ -339,7 +339,7 @@ export struct Node {
 
     Token token() const {
         auto copy = _tokens;
-        return copy.next().unwrap();
+        return copy.next().expect();
     }
 
     Str fullname() const {
@@ -367,7 +367,7 @@ export struct Node {
                 return NONE;
             if (token->type != Token::PROP)
                 return NONE;
-            return Some(Prop{token.unwrap(), _inherited});
+            return Some(Prop{token.expect(), _inherited});
         }
     };
 
@@ -449,7 +449,7 @@ export struct Node {
 
     void dump(Io::Emit& e) const {
         e("{}", name());
-        if (auto [addr] = address())
+        if (auto const& [addr] = address())
             e(" @ {:p}", addr);
         e(" {:#} ", fullname());
         e(" {");
