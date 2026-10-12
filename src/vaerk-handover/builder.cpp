@@ -1,7 +1,6 @@
 export module Vaerk.Handover:builder;
 
 import Karm.Core;
-import Karm.Logger;
 import :spec;
 
 using namespace Karm;
@@ -38,16 +37,17 @@ export struct Builder {
     void* _buf{};
     usize _size{};
     char* _string{};
-    _Vec<ViewBuf<Record>> _records;
+    ViewVec<Record> _records;
 
     Builder(MutSlice<u8> slice)
         : _buf(slice.buf()),
           _size(slice.len()),
           _string((char*)end(slice)),
-          _records(ViewBuf{
+          _records(
+              WRAP,
               reinterpret_cast<Manual<Record>*>(payload().records),
-              _size / sizeof(Record),
-          }) {
+              (_size - sizeof(Payload)) / sizeof(Record)
+          ) {
         payload() = {};
         payload().magic = COOLBOOT;
         payload().size = slice.len();
@@ -55,6 +55,14 @@ export struct Builder {
 
     Payload& payload() {
         return *static_cast<Payload*>(_buf);
+    }
+
+    // NOTE: Records grow up from the header and strings grow down from the
+    //       end of the payload, make sure they never meet.
+    void _ensure(usize recordBytes, usize stringBytes) {
+        auto* recordsEnd = reinterpret_cast<char*>(payload().records + _records.len()) + recordBytes;
+        if (recordsEnd > _string - stringBytes)
+            panic("handover: payload full");
     }
 
     void add(Record record) {
@@ -68,7 +76,6 @@ export struct Builder {
             if (other.tag == record.tag and
                 other.end() == record.start and
                 isFree(record.tag)) {
-                // logDebug("handover: merge {} with {}", record, other);
                 _records.removeAt(i);
                 other.size += record.size;
                 add(other);
@@ -79,7 +86,6 @@ export struct Builder {
             if (other.tag == record.tag and
                 other.start == record.end() and
                 isFree(record.tag)) {
-                // logDebug("handover: merge {} with {}", record, other);
 
                 _records.removeAt(i);
                 record.size += other.size;
@@ -89,8 +95,6 @@ export struct Builder {
 
             if (colidesWith(record, other)) {
                 if (isFree(record.tag) and not isFree(other.tag)) {
-                    // logDebug("handover: splitting record {} with {}", record, other);
-
                     _records.removeAt(i);
                     auto [lower, upper] = split(record, other);
 
@@ -99,8 +103,6 @@ export struct Builder {
                     add(upper);
                     return;
                 } else if (not isFree(record.tag) and isFree(other.tag)) {
-                    // logDebug("handover: splitting record {} with {}", other, record);
-
                     _records.removeAt(i);
 
                     auto [lower, upper] = split(other, record);
@@ -109,19 +111,19 @@ export struct Builder {
                     add(upper);
                     return;
                 } else {
-                    logWarn("handover: record {} colides with {}", record, other);
+                    // dropping coliding record
                     return;
                 }
             }
 
             if (other.start > record.start) {
-                // logDebug("handover: insert {} at {}", record, i);
+                _ensure(sizeof(Record), 0);
                 _records.insert(i, record);
                 return;
             }
         }
 
-        // logDebug("handover: append {}", record);
+        _ensure(sizeof(Record), 0);
         _records.pushBack(record);
     }
 
@@ -136,6 +138,7 @@ export struct Builder {
     }
 
     usize add(Str str) {
+        _ensure(0, str.len() + 1);
         _string -= str.len() + 1;
         std::memcpy(_string, str.buf(), str.len());
         _string[str.len()] = '\0';

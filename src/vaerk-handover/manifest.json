@@ -7,7 +7,6 @@
         "export-headers": "includes"
     },
     "requires": [
-        "karm-core",
-        "karm-logger"
+        "karm-core"
     ]
 }
