@@ -116,11 +116,11 @@ export inline void wrxcr(u32 i, u64 value) {
 }
 
 export inline void xsave(void* region) {
-    asm volatile("xsave (%0)" ::"a"(region));
+    asm volatile("xsave (%0)" ::"r"(region), "a"(~0u), "d"(~0u) : "memory");
 }
 
 export inline void xrstor(void const* region) {
-    asm volatile("xrstor (%0)" ::"a"(region));
+    asm volatile("xrstor (%0)" ::"r"(region), "a"(~0u), "d"(~0u) : "memory");
 }
 
 export inline void fninit(void) {
@@ -128,11 +128,11 @@ export inline void fninit(void) {
 }
 
 export inline void fxsave(void* region) {
-    asm volatile("fxsave (%0)" ::"a"(region));
+    asm volatile("fxsave (%0)" ::"r"(region) : "memory");
 }
 
 export inline void fxrstor(void const* region) {
-    asm volatile("fxrstor (%0)" ::"a"(region));
+    asm volatile("fxrstor (%0)" ::"r"(region) : "memory");
 }
 
 // MARK: Msrs ------------------------------------------------------------------

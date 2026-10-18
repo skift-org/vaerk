@@ -93,8 +93,8 @@ export union Cpuid {
         return cpuid(0x7, 0).ebx & (1 << 16);
     }
 
-    static bool xsaveSize() {
-        return cpuid(0x0d, 0).ecx;
+    static usize xsaveSize() {
+        return cpuid(0x0d, 0).ebx;
     }
 };
 
