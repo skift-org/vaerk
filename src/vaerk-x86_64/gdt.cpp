@@ -89,12 +89,12 @@ export struct [[gnu::packed]] Gdt {
         LONG_MODE = 0b10,
     };
 
-    Karm::Array<GdtEntry, Gdt::LEN - 1> entries = {
+    Array<GdtEntry, LEN - 1> entries = {
         GdtEntry{},
-        {Gdt::Flags::PRESENT | Gdt::Flags::SEGMENT | Gdt::Flags::READ_WRITE | Gdt::Flags::EXECUTABLE, Granularity::LONG_MODE},
-        {Gdt::Flags::PRESENT | Gdt::Flags::SEGMENT | Gdt::Flags::READ_WRITE, 0},
-        {Gdt::Flags::PRESENT | Gdt::Flags::SEGMENT | Gdt::Flags::READ_WRITE | Gdt::Flags::USER, 0},
-        {Gdt::Flags::PRESENT | Gdt::Flags::SEGMENT | Gdt::Flags::READ_WRITE | Gdt::Flags::EXECUTABLE | Gdt::Flags::USER, Granularity::LONG_MODE},
+        {PRESENT | SEGMENT | READ_WRITE | EXECUTABLE, LONG_MODE},
+        {PRESENT | SEGMENT | READ_WRITE, 0},
+        {PRESENT | SEGMENT | READ_WRITE | USER, 0},
+        {PRESENT | SEGMENT | READ_WRITE | EXECUTABLE | USER, LONG_MODE},
     };
 
     GdtTssEntry tssEntry;
