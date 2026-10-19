@@ -5,13 +5,6 @@ import :spec;
 
 using namespace Karm;
 
-export template <>
-struct Karm::Io::Formatter<Handover::Record> {
-    Res<> format(Io::TextWriter& writer, Handover::Record record) {
-        return Io::format(writer, "Record({}, {:x}-{:x})", record.name(), record.start, record.end());
-    }
-};
-
 namespace Handover {
 
 export inline urange rangeOf(Record record) {
@@ -75,7 +68,7 @@ export struct Builder {
             // Merge with previous
             if (other.tag == record.tag and
                 other.end() == record.start and
-                isFree(record.tag)) {
+                record.tag == FREE) {
                 _records.removeAt(i);
                 other.size += record.size;
                 add(other);
@@ -85,7 +78,7 @@ export struct Builder {
             // Merge with next
             if (other.tag == record.tag and
                 other.start == record.end() and
-                isFree(record.tag)) {
+                record.tag == FREE) {
 
                 _records.removeAt(i);
                 record.size += other.size;
@@ -94,7 +87,7 @@ export struct Builder {
             }
 
             if (colidesWith(record, other)) {
-                if (isFree(record.tag) and not isFree(other.tag)) {
+                if (record.tag == FREE and other.tag != FREE) {
                     _records.removeAt(i);
                     auto [lower, upper] = split(record, other);
 
@@ -102,7 +95,7 @@ export struct Builder {
                     add(lower);
                     add(upper);
                     return;
-                } else if (not isFree(record.tag) and isFree(other.tag)) {
+                } else if (record.tag != FREE and other.tag == FREE) {
                     _records.removeAt(i);
 
                     auto [lower, upper] = split(other, record);

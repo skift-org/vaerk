@@ -7,16 +7,16 @@ using namespace Karm;
 namespace Handover {
 
 #ifdef __ck_paging_sv39__
-export inline usize UPPER_HALF = 0xffffffff00000000;
+export constexpr usize UPPER_HALF = 0xffffffff00000000;
 #elifdef __ck_bits_64__
-export inline usize KERNEL_BASE = 0xffffffff80000000;
-export inline usize UPPER_HALF = 0xffff800000000000;
+export constexpr usize KERNEL_BASE = 0xffffffff80000000;
+export constexpr usize UPPER_HALF = 0xffff800000000000;
 #else
 export inline usize KERNEL_BASE = 0xc0000000;
 export inline usize UPPER_HALF = 0xc0000000;
 #endif
 
-export inline constexpr u32 COOLBOOT = 0xc001b001;
+export constexpr u32 COOLBOOT = 0xc001b001;
 
 #define FOREACH_TAG(TAG)      \
     TAG(FREE, 0)              \
@@ -49,10 +49,6 @@ export inline char const* tagName(Tag tag) {
 #undef ITER
     }
     return "UNKNOWN";
-}
-
-export inline bool isFree(Tag tag) {
-    return tag == FREE;
 }
 
 export enum struct PixelFormat : u16 {
@@ -133,7 +129,7 @@ export struct Payload {
 
     Record const* blobByName(char const* name) const {
         for (auto const& r : *this) {
-            if (r.tag == Tag::BLOB and cstrEq(stringAt(r.blob.name), name)) {
+            if (r.tag == BLOB and cstrEq(stringAt(r.blob.name), name)) {
                 return &r;
             }
         }
@@ -157,7 +153,7 @@ export struct Payload {
         return records + len;
     }
 
-    usize sum(Handover::Tag tag) {
+    usize sum(Tag tag) {
         usize total = 0;
         for (auto const& r : *this) {
             if (r.tag == tag) {
@@ -169,7 +165,7 @@ export struct Payload {
 
     Record find(usize size) {
         for (auto& r : *this) {
-            if (r.tag == Tag::FREE and r.size >= size) {
+            if (r.tag == FREE and r.size >= size) {
                 return r;
             }
         }
@@ -183,7 +179,7 @@ export struct Payload {
         usize start = 0, end = 0;
 
         for (auto const& r : *this) {
-            if (r.tag == Tag::FREE) {
+            if (r.tag == FREE) {
                 if (r.start < start or first) {
                     start = r.start;
                     first = false;
@@ -211,35 +207,35 @@ export struct Request {
     }
 };
 
-export inline constexpr Request requestSelf() {
-    return {Tag::SELF, 0, 0};
+export constexpr Request requestSelf() {
+    return {SELF, 0, 0};
 }
 
-export inline constexpr Request requestStack(u64 preferedSize = 64 * 1024) {
-    return {Tag::STACK, 0, preferedSize};
+export constexpr Request requestStack(u64 preferedSize = 64 * 1024) {
+    return {STACK, 0, preferedSize};
 }
 
-export inline constexpr Request requestKernel() {
-    return {Tag::KERNEL, 0, 0};
+export constexpr Request requestKernel() {
+    return {KERNEL, 0, 0};
 }
 
-export inline constexpr Request requestBlobs() {
-    return {Tag::BLOB, 0, 0};
+export constexpr Request requestBlobs() {
+    return {BLOB, 0, 0};
 }
 
-export inline constexpr Request requestRsdp() {
-    return {Tag::RSDP, 0, 0};
+export constexpr Request requestRsdp() {
+    return {RSDP, 0, 0};
 }
 
-export inline constexpr Request requestFdt() {
-    return {Tag::FDT, 0, 0};
+export constexpr Request requestFdt() {
+    return {FDT, 0, 0};
 }
 
-export inline constexpr Request requestFb(PixelFormat preferedFormat = PixelFormat::BGRX8888) {
-    return {Tag::FB, 0, (u64)preferedFormat};
+export constexpr Request requestFb(PixelFormat preferredFormat = PixelFormat::BGRX8888) {
+    return {FB, 0, static_cast<u64>(preferredFormat)};
 }
 
-export inline bool valid(u32 magic, Payload const& payload) {
+export bool valid(u32 magic, Payload const& payload) {
     if (magic != COOLBOOT)
         return false;
 
@@ -249,8 +245,15 @@ export inline bool valid(u32 magic, Payload const& payload) {
     return true;
 }
 
-export inline constexpr char const* REQUEST_SECTION = ".handover";
+export constexpr char const* REQUEST_SECTION = ".handover";
 
 export using EntryPoint = void (*)(u64 magic, Payload const* handover);
 
 } // namespace Handover
+
+export template <>
+struct Io::Formatter<Handover::Record> {
+    Res<> format(TextWriter& writer, Handover::Record record) {
+        return Io::format(writer, "Record({}, {:x}-{:x})", record.name(), record.start, record.end());
+    }
+};
