@@ -26,6 +26,14 @@ export inline Pair<Record, Record> split(Record record, Record other) {
     return {lowerRecord, upperRecord};
 }
 
+static usize _collisionRank(Tag tag) {
+    if (tag == FREE)
+        return 0;
+    if (tag == LOADER)
+        return 1;
+    return 2;
+}
+
 export struct Builder {
     void* _buf{};
     usize _size{};
@@ -87,7 +95,7 @@ export struct Builder {
             }
 
             if (colidesWith(record, other)) {
-                if (record.tag == FREE and other.tag != FREE) {
+                if (_collisionRank(record.tag) < _collisionRank(other.tag)) {
                     _records.removeAt(i);
                     auto [lower, upper] = split(record, other);
 
@@ -95,7 +103,7 @@ export struct Builder {
                     add(lower);
                     add(upper);
                     return;
-                } else if (record.tag != FREE and other.tag == FREE) {
+                } else if (_collisionRank(record.tag) > _collisionRank(other.tag)) {
                     _records.removeAt(i);
 
                     auto [lower, upper] = split(other, record);
@@ -142,9 +150,8 @@ export struct Builder {
         payload().agent = add(str);
     }
 
-    Payload& finalize() {
+    void finalize() {
         payload().len = _records.len();
-        return payload();
     }
 };
 

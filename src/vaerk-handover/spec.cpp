@@ -6,16 +6,6 @@ using namespace Karm;
 
 namespace Handover {
 
-#ifdef __ck_paging_sv39__
-export constexpr usize UPPER_HALF = 0xffffffff00000000;
-#elifdef __ck_bits_64__
-export constexpr usize KERNEL_BASE = 0xffffffff80000000;
-export constexpr usize UPPER_HALF = 0xffff800000000000;
-#else
-export inline usize KERNEL_BASE = 0xc0000000;
-export inline usize UPPER_HALF = 0xc0000000;
-#endif
-
 export constexpr u32 COOLBOOT = 0xc001b001;
 
 #define FOREACH_TAG(TAG)      \
