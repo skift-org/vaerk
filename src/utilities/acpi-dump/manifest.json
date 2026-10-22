@@ -1,0 +1,10 @@
+{
+    "$schema": "https://schemas.cute.engineering/stable/cutekit.manifest.component.v1",
+    "id": "acpi-dump",
+    "type": "exe",
+    "requires": [
+        "vaerk-acpi",
+        "karm-sys",
+        "karm-cli"
+    ]
+}

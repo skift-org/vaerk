@@ -9,7 +9,7 @@ using namespace Karm::Literals;
 using namespace Vaerk;
 
 Async::Task<> entryPointAsync(Sys::Env& env, Async::CancellationToken) {
-    auto inputArg = Cli::operand<Str>("dtb-dump"s, "Path to the device tree blob"s);
+    auto inputArg = Cli::operand<Str>("dtb-blob"s, "Path to the device tree blob"s);
 
     Cli::Command cmd{
         "dtb-dump"s,
