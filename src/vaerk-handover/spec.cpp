@@ -57,6 +57,7 @@ export struct Record {
     }
 
     union {
+        // for FB
         struct
         {
             u16 width;
@@ -65,13 +66,17 @@ export struct Record {
             PixelFormat format;
         } fb;
 
+        // for BLOB
         struct
         {
             u32 name;
             u32 meta;
         } blob;
 
-        u64 more;
+        // for STACK, SELF, and KERNEL
+        u64 vaddr; 
+
+        u64 more; 
     };
 
     u64 end() const {

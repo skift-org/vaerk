@@ -128,13 +128,13 @@ export struct Builder {
         _records.pushBack(record);
     }
 
-    void add(Tag tag, u32 flags = 0, urange range = {}, u64 more = 0) {
+    void add(Tag tag, u32 flags = 0, urange range = {}, u64 vaddr = 0) {
         add({
             .tag = tag,
             .flags = flags,
             .start = range.start,
             .size = range.size,
-            .more = more,
+            .vaddr = vaddr,
         });
     }
 
