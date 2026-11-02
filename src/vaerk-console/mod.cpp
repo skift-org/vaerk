@@ -7,7 +7,7 @@ using namespace Karm;
 namespace Vaerk {
 
 u8 _FONT_DATA[]{
-#include "defs/firacode.inc"
+#include "defs/cousine.inc"
 };
 
 export struct Console : Io::TextWriter {
@@ -89,7 +89,7 @@ export struct Console : Io::TextWriter {
     Font _font{
         {_FONT_DATA, sizeof(_FONT_DATA)},
         10,
-        20,
+        18,
     };
     usize _cx = 0, _cy = 0;
 
