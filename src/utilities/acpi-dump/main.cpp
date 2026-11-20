@@ -29,10 +29,28 @@ Async::Task<> entryPointAsync(Sys::Env& env, Async::CancellationToken) {
     auto url = Ref::parseUrlOrPath(inputArg.value(), env.cwd());
     auto file = co_try$(Sys::File::open(url));
     auto map = co_try$(Sys::mmap(file));
-    auto dtb = co_try$(Dtb::Blob::open(map.bytes()));
+    auto bytes = map.bytes();
+
+    auto table = bytes.cast<Acpi::Sdth>().index(0);
+    if (not table or table->len < sizeof(Acpi::Sdth) or table->len > bytes.len())
+        co_return Error::invalidData("invalid acpi table");
 
     Io::Emit e{Sys::out()};
-    dtb.dump(e);
+    Str signature = table->signature;
+    if (signature == "FACP"s)
+        table->as<Acpi::Fadt>()->repr(e);
+    else if (signature == "HPET"s)
+        table->as<Acpi::Hpet>()->repr(e);
+    else if (signature == "APIC"s)
+        table->as<Acpi::Madt>()->repr(e);
+    else if (signature == "MCFG"s)
+        table->as<Acpi::Mcfg>()->repr(e);
+    else if (signature == "RSDT"s)
+        table->as<Acpi::Rsdt>()->repr(e);
+    else if (signature == "XSDT"s)
+        table->as<Acpi::Xsdt>()->repr(e);
+    else
+        table->repr(e);
 
     co_return Ok();
 }

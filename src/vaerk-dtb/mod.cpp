@@ -170,31 +170,48 @@ struct Token {
 struct TokenIter {
     Bytes strings;
     Io::BScan tokens;
+    Res<> _status = Ok();
+
+    Res<Opt<Token>> _next() {
+        if (tokens.ended())
+            return Ok(NONE);
+        auto type = static_cast<Token::Type>(try$(tokens.nextU32be()));
+        if (type == Token::BEGIN_NODE) {
+            auto fullname = try$(tokens.nextCStr());
+            try$(tokens.align(sizeof(u32)));
+            return Ok(Some(Token{.type = type, .fullname = fullname}));
+        } else if (type == Token::END_NODE) {
+            return Ok(Some(Token{.type = type}));
+        } else if (type == Token::PROP) {
+            auto len = try$(tokens.nextU32be());
+            auto nameoff = try$(tokens.nextU32be());
+            auto name = try$(Io::BScan{Karm::next(strings, nameoff)}.nextCStr());
+            auto extra = try$(tokens.nextBytes(len));
+            try$(tokens.align(sizeof(u32)));
+            return Ok(Some(Token{.type = type, .fullname = name, .extra = extra}));
+        } else if (type == Token::NOP) {
+            return Ok(Some(Token{.type = type}));
+        } else if (type == Token::END) {
+            return Ok(NONE);
+        } else {
+            return Error::invalidData("invalid token");
+        }
+    }
 
     Opt<Token> next() {
-        if (tokens.ended())
+        if (not _status)
             return NONE;
-        auto type = static_cast<Token::Type>(tokens.nextU32be());
-        if (type == Token::BEGIN_NODE) {
-            auto fullname = tokens.nextCStr();
-            tokens.align(sizeof(u32));
-            return Some(Token{.type = type, .fullname = fullname});
-        } else if (type == Token::END_NODE) {
-            return Some(Token{.type = type});
-        } else if (type == Token::PROP) {
-            auto len = tokens.nextU32be();
-            auto nameoff = tokens.nextU32be();
-            auto name = Io::BScan{strings}.skip(nameoff).nextCStr();
-            auto extra = tokens.nextBytes(len);
-            tokens.align(sizeof(u32));
-            return Some(Token{.type = type, .fullname = name, .extra = extra});
-        } else if (type == Token::NOP) {
-            return Some(Token{.type = type});
-        } else if (type == Token::END) {
+
+        auto token = _next();
+        if (not token) {
+            _status = token.none();
             return NONE;
-        } else {
-            panic("invalid token");
         }
+        return token.take();
+    }
+
+    Res<> status() const {
+        return _status;
     }
 };
 
@@ -487,7 +504,7 @@ export struct Blob : Io::BChunk {
         if (dtb.len() < sizeof(Header))
             return Error::invalidData("data too small");
 
-        auto header = Io::BScan{dtb}.next<Header>();
+        auto header = try$(Io::BScan{dtb}.next<Header>());
 
         if (header.magic != MAGIC)
             return Error::invalidData("invalid magic number");
@@ -504,7 +521,13 @@ export struct Blob : Io::BChunk {
         if (not header.dtbRange().contains(header.stringsRange()))
             return Error::invalidData("invalid strings block range");
 
-        return Ok(Blob{dtb, header});
+        Blob blob{dtb, header};
+        auto tokens = blob.iterTokens();
+        while (tokens.next())
+            ;
+        try$(tokens.status());
+
+        return Ok(blob);
     }
 
     Bytes stringsBlock() const {
