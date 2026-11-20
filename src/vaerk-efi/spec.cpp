@@ -499,8 +499,8 @@ export struct Key {
 
         return {
             .type = App::KeyboardEvent::PRESS,
-            .key = key,
-            .code = key,
+            .logicalKey = key,
+            .physicalKey = key,
             .mods = {}
         };
     }
