@@ -171,10 +171,10 @@ export struct Com : Io::TextWriter {
     }
 
     Res<> writeRune(Rune rune) override {
-        Utf8::One one;
-        if (not Utf8::encodeUnit(rune, one))
+        Utf8::Sequence sequence;
+        if (not Utf8::encodeUnit(rune, sequence))
             return Error::invalidInput("encoding error");
-        try$(write(bytes(one)));
+        try$(write(bytes(sequence)));
         return Ok();
     }
 };
