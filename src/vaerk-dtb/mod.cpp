@@ -325,6 +325,23 @@ export struct Prop {
             e("");
         }
     }
+
+    template <Cell C>
+    struct CellIter {
+        Cursor<u32be> _cursor;
+        InheritedProperties _inherited;
+
+        Opt<C> next() {
+            if (_cursor.ended())
+                return NONE;
+            return C::parse(_cursor, _inherited).ok();
+        }
+    };
+
+    template <Cell C>
+    CellIter<C> iterCells() const {
+        return {regs32(), _inherited};
+    }
 };
 
 export struct Node {
@@ -462,6 +479,21 @@ export struct Node {
     Opt<T> getProperty(Str name) const {
         auto prop = try$(getProperty(name));
         return prop.as<T>();
+    }
+
+    Prop::CellIter<AddressSizeCell> iterRegs() const {
+        if (auto const& [reg] = getProperty("reg"))
+            return reg.iterCells<AddressSizeCell>();
+        return {{}, _inherited};
+    }
+
+    bool enabled() const {
+        if (auto const& [status] = getProperty("status")) {
+            if (auto const& [value] = status.iterStr().next())
+                return value == "okay" or value == "ok";
+            return false;
+        }
+        return true;
     }
 
     void dump(Io::Emit& e) const {
